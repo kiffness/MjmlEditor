@@ -1,0 +1,10 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0
+
+WORKDIR /workspace
+
+ENV ASPNETCORE_ENVIRONMENT=Development \
+    ASPNETCORE_URLS=http://0.0.0.0:8080
+
+EXPOSE 8080
+
+CMD ["sh", "-c", "dotnet restore backend/MjmlEditor.Api/MjmlEditor.Api.csproj && dotnet run --project backend/MjmlEditor.Api/MjmlEditor.Api.csproj --no-launch-profile --urls http://0.0.0.0:8080"]
