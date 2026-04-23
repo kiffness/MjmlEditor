@@ -40,6 +40,10 @@ public sealed record EmailTemplateEditorBlockDto
 
     public EmailTemplateEditorTextDecoration? TextDecoration { get; init; }
 
+    public EmailTemplateEditorBlockLayout? Layout { get; init; }
+
+    public EmailTemplateEditorBlockActionPlacement? ActionPlacement { get; init; }
+
     public int? Spacing { get; init; }
 
     public string? DividerColor { get; init; }

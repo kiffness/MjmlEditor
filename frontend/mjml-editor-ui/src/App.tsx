@@ -101,12 +101,38 @@ function getPreviewSignature(draft: TemplateDraft) {
   })
 }
 
+function cloneDraftState(draft: TemplateDraft): TemplateDraft {
+  return {
+    ...draft,
+    editorDocument: cloneEditorDocument(draft.editorDocument),
+  }
+}
+
+function getDraftStateSignature(draft: TemplateDraft) {
+  return JSON.stringify({
+    name: draft.name,
+    subject: draft.subject,
+    status: draft.status,
+    mjmlBody: draft.mjmlBody,
+    editorDocument: draft.editorDocument,
+  })
+}
+
 function getPublishButtonLabel(hasUnsavedChanges: boolean, isPublishing: boolean) {
   if (isPublishing) {
     return hasUnsavedChanges ? 'Saving & publishing…' : 'Publishing…'
   }
 
   return hasUnsavedChanges ? 'Save & publish' : 'Publish'
+}
+
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) {
+    return false
+  }
+
+  return target.isContentEditable
+    || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName)
 }
 
 function parseAppRoute(pathname: string): AppRoute {
@@ -145,6 +171,8 @@ function App() {
   const previewRenderRequestIdRef = useRef(0)
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateDto | null>(null)
   const [draft, setDraft] = useState<TemplateDraft | null>(null)
+  const [draftHistoryPast, setDraftHistoryPast] = useState<TemplateDraft[]>([])
+  const [draftHistoryFuture, setDraftHistoryFuture] = useState<TemplateDraft[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('All')
   const [isTenantsLoading, setIsTenantsLoading] = useState(false)
@@ -218,6 +246,8 @@ function App() {
   const currentSelectedSectionId = selection.sectionId
   const currentSelectedColumnId = selection.columnId
   const currentSelectedBlockId = selection.blockId
+  const canUndoBuilderChange = draftHistoryPast.length > 0
+  const canRedoBuilderChange = draftHistoryFuture.length > 0
 
   const filteredTemplates = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -302,7 +332,7 @@ function App() {
     setTemplates([])
     setSelectedTemplateId(null)
     setSelectedTemplate(null)
-    setDraft(null)
+    resetDraftState(null)
     setRevisions([])
     setSearch('')
     setStatusFilter('All')
@@ -471,7 +501,7 @@ function App() {
         if (nextTenantId !== previousTenantId) {
           setActiveTemplateId(null)
           setSelectedTemplate(null)
-          setDraft(null)
+          resetDraftState(null)
         }
         setIsTemplatesLoading(Boolean(nextTenantId))
         setActiveTenant(nextTenantId)
@@ -521,7 +551,7 @@ function App() {
         if (response.length === 0) {
           setActiveTemplateId(null)
           setSelectedTemplate(null)
-          setDraft(null)
+          resetDraftState(null)
         } else {
           setActiveTemplateId(nextTemplateId)
         }
@@ -566,7 +596,7 @@ function App() {
         }
 
         setSelectedTemplate(response)
-        setDraft(toDraft(response))
+        resetDraftState(toDraft(response))
         setErrorMessage(null)
       } catch (error) {
         if (!isActive || handleUnauthorized(error)) {
@@ -574,7 +604,7 @@ function App() {
         }
 
         setSelectedTemplate(null)
-        setDraft(null)
+        resetDraftState(null)
         setErrorMessage(getErrorMessage(error, 'Unable to load the selected template.'))
       } finally {
         if (isActive) {
@@ -637,7 +667,7 @@ function App() {
     }
     setActiveTemplateId(null)
     setSelectedTemplate(null)
-    setDraft(null)
+    resetDraftState(null)
     resetPreview()
     setInfoMessage(null)
     setErrorMessage(null)
@@ -665,12 +695,57 @@ function App() {
     setRefreshNonce((current) => current + 1)
   }
 
-  function updateDraft(field: keyof TemplateDraft, value: string) {
-    setDraft((current) => {
-      if (!current) {
-        return current
-      }
+  function resetDraftState(nextDraft: TemplateDraft | null) {
+    setDraft(nextDraft)
+    setDraftHistoryPast([])
+    setDraftHistoryFuture([])
+  }
 
+  const applyDraftUpdate = useCallback((updater: (current: TemplateDraft) => TemplateDraft | null) => {
+    if (!draft) {
+      return
+    }
+
+    const currentDraft = cloneDraftState(draft)
+    const nextDraft = updater(currentDraft)
+
+    if (!nextDraft) {
+      return
+    }
+
+    if (getDraftStateSignature(nextDraft) === getDraftStateSignature(draft)) {
+      return
+    }
+
+    setDraftHistoryPast((current) => [...current, cloneDraftState(draft)])
+    setDraftHistoryFuture([])
+    setDraft(nextDraft)
+  }, [draft])
+
+  const handleUndoBuilderChange = useCallback(() => {
+    if (!draft || draftHistoryPast.length === 0) {
+      return
+    }
+
+    const previousDraft = draftHistoryPast[draftHistoryPast.length - 1]
+    setDraftHistoryPast((current) => current.slice(0, -1))
+    setDraftHistoryFuture((current) => [cloneDraftState(draft), ...current])
+    setDraft(cloneDraftState(previousDraft))
+  }, [draft, draftHistoryPast])
+
+  const handleRedoBuilderChange = useCallback(() => {
+    if (!draft || draftHistoryFuture.length === 0) {
+      return
+    }
+
+    const [nextDraft, ...remainingFuture] = draftHistoryFuture
+    setDraftHistoryPast((current) => [...current, cloneDraftState(draft)])
+    setDraftHistoryFuture(remainingFuture)
+    setDraft(cloneDraftState(nextDraft))
+  }, [draft, draftHistoryFuture])
+
+  const updateDraft = useCallback((field: keyof TemplateDraft, value: string) => {
+    applyDraftUpdate((current) => {
       const nextDraft = { ...current, [field]: value }
 
       if (field !== 'status' && current.status === 'Published') {
@@ -679,7 +754,7 @@ function App() {
 
       return nextDraft
     })
-  }
+  }, [applyDraftUpdate])
 
   function handleInsertMjmlSnippet(snippet: string) {
     if (!draft || draft.editorDocument) {
@@ -705,9 +780,9 @@ function App() {
     })
   }
 
-  function updateEditorDocument(updater: (current: EditorDocument) => EditorDocument) {
-    setDraft((current) => {
-      if (!current || !current.editorDocument) {
+  const updateEditorDocument = useCallback((updater: (current: EditorDocument) => EditorDocument) => {
+    applyDraftUpdate((current) => {
+      if (!current.editorDocument) {
         return current
       }
 
@@ -722,14 +797,10 @@ function App() {
 
       return nextDraft
     })
-  }
+  }, [applyDraftUpdate])
 
   function handleStartBuilder(preset: BuilderPreset = 'hero') {
-    setDraft((current) => {
-      if (!current) {
-        return current
-      }
-
+    applyDraftUpdate((current) => {
       const nextDraft = {
         ...current,
         editorDocument: {
@@ -749,16 +820,14 @@ function App() {
 
   function handleAddSection(columnCount: number) {
     if (!draft?.editorDocument) {
-      setDraft((current) => current
-        ? {
-            ...current,
-            status: current.status === 'Published' ? 'Draft' : current.status,
-            editorDocument: {
-              version: 1,
-              sections: [createSection(columnCount)],
-            },
-          }
-        : current)
+      applyDraftUpdate((current) => ({
+        ...current,
+        status: current.status === 'Published' ? 'Draft' : current.status,
+        editorDocument: {
+          version: 1,
+          sections: [createSection(columnCount)],
+        },
+      }))
       setActiveBuilderTab('sections')
       return
     }
@@ -1016,7 +1085,7 @@ function App() {
     setSelectedBlockId(nextDuplicatedSection.columns[0]?.blocks[0]?.id ?? null)
   }
 
-  function handleDeleteSection(sectionId: string) {
+  const handleDeleteSection = useCallback((sectionId: string) => {
     updateEditorDocument((current) => ({
       ...current,
       sections: current.sections.filter((section) => section.id !== sectionId),
@@ -1027,7 +1096,7 @@ function App() {
       setSelectedColumnId(null)
       setSelectedBlockId(null)
     }
-  }
+  }, [selectedSectionId, updateEditorDocument])
 
   function handleDuplicateBlock(sectionId: string, columnId: string, blockId: string) {
     const section = draft?.editorDocument?.sections.find((candidate) => candidate.id === sectionId)
@@ -1072,7 +1141,7 @@ function App() {
     setSelectedBlockId(nextDuplicatedBlock.id)
   }
 
-  function handleDeleteBlock(sectionId: string, columnId: string, blockId: string) {
+  const handleDeleteBlock = useCallback((sectionId: string, columnId: string, blockId: string) => {
     updateEditorDocument((current) => ({
       ...current,
       sections: current.sections.map((section) => {
@@ -1094,7 +1163,7 @@ function App() {
     if (selectedBlockId === blockId) {
       setSelectedBlockId(null)
     }
-  }
+  }, [selectedBlockId, updateEditorDocument])
 
   function clearDragState() {
     setDraggedSectionId(null)
@@ -1244,6 +1313,73 @@ function App() {
     handleInsertDraggedBlock(targetSectionId, targetColumnId)
   }
 
+  useEffect(() => {
+    if (!isEditorRoute || !draft?.editorDocument) {
+      return
+    }
+
+    function handleDeleteSelection() {
+      if (currentSelectedBlockId && currentSelectedSectionId && currentSelectedColumnId) {
+        handleDeleteBlock(currentSelectedSectionId, currentSelectedColumnId, currentSelectedBlockId)
+        return
+      }
+
+      if (currentSelectedSectionId) {
+        handleDeleteSection(currentSelectedSectionId)
+      }
+    }
+
+    function handleBuilderKeyDown(event: KeyboardEvent) {
+      if (isEditableTarget(event.target)) {
+        return
+      }
+
+      const isModifierPressed = event.ctrlKey || event.metaKey
+
+      if (isModifierPressed && event.key.toLowerCase() === 'z') {
+        event.preventDefault()
+        if (event.shiftKey) {
+          handleRedoBuilderChange()
+        } else {
+          handleUndoBuilderChange()
+        }
+        return
+      }
+
+      if (isModifierPressed && event.key.toLowerCase() === 'y') {
+        event.preventDefault()
+        handleRedoBuilderChange()
+        return
+      }
+
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setSelectedSectionId(null)
+        setSelectedColumnId(null)
+        setSelectedBlockId(null)
+        return
+      }
+
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault()
+        handleDeleteSelection()
+      }
+    }
+
+    window.addEventListener('keydown', handleBuilderKeyDown)
+    return () => window.removeEventListener('keydown', handleBuilderKeyDown)
+  }, [
+    currentSelectedBlockId,
+    currentSelectedColumnId,
+    currentSelectedSectionId,
+    draft?.editorDocument,
+    handleDeleteBlock,
+    handleDeleteSection,
+    handleRedoBuilderChange,
+    handleUndoBuilderChange,
+    isEditorRoute,
+  ])
+
   async function handleLogin() {
     setIsAuthenticating(true)
     setInfoMessage(null)
@@ -1303,7 +1439,7 @@ function App() {
     const nextDraft = toDraft(updated)
 
     setSelectedTemplate(updated)
-    setDraft(nextDraft)
+    resetDraftState(nextDraft)
     setTemplates((current) =>
       current.map((template) => (template.id === updated.id ? toSummary(updated) : template))
     )
@@ -1380,7 +1516,7 @@ function App() {
       setTemplates((current) => [toSummary(created), ...current])
       setActiveTemplateId(created.id)
       setSelectedTemplate(created)
-      setDraft(toDraft(created))
+      resetDraftState(toDraft(created))
       resetPreview()
       setInfoMessage('New draft created.')
       setErrorMessage(null)
@@ -1414,7 +1550,7 @@ function App() {
       setTemplates((current) => [toSummary(created), ...current])
       setActiveTemplateId(created.id)
       setSelectedTemplate(created)
-      setDraft(toDraft(created))
+      resetDraftState(toDraft(created))
       resetPreview()
       setInfoMessage('Template duplicated.')
       setErrorMessage(null)
@@ -1474,7 +1610,7 @@ function App() {
       setTemplates(remainingTemplates)
       setActiveTemplateId(remainingTemplates[0]?.id ?? null)
       setSelectedTemplate(null)
-      setDraft(null)
+      resetDraftState(null)
       resetPreview()
       if (route.kind === 'editor') {
         navigateToRoute({ kind: 'library' }, true)
@@ -1646,6 +1782,7 @@ function App() {
                   selectedBlock={selectedBlock}
                   selectedSectionId={currentSelectedSectionId}
                   selectedColumnId={currentSelectedColumnId}
+                  selectedBlockId={currentSelectedBlockId}
                   handleAddBlock={handleAddBlock}
                   handlePaletteBlockDragStart={handlePaletteBlockDragStart}
                   handleAddSection={handleAddSection}
@@ -1659,6 +1796,7 @@ function App() {
                   handleRemoveSelectedBlockItem={handleRemoveSelectedBlockItem}
                   handleSelectSection={handleSelectSection}
                   handleSelectColumn={handleSelectColumn}
+                  handleSelectBlock={handleSelectBlock}
                   handleStartBuilder={handleStartBuilder}
                   clearDragState={clearDragState}
                 />
@@ -1691,6 +1829,11 @@ function App() {
                   handleDeleteSection={handleDeleteSection}
                   handleDuplicateBlock={handleDuplicateBlock}
                   handleDeleteBlock={handleDeleteBlock}
+                  canUndo={canUndoBuilderChange}
+                  canRedo={canRedoBuilderChange}
+                  handleUndo={handleUndoBuilderChange}
+                  handleRedo={handleRedoBuilderChange}
+                  handleUpdateSelectedBlock={handleUpdateSelectedBlock}
                 />
 
                 <aside className="space-y-6">

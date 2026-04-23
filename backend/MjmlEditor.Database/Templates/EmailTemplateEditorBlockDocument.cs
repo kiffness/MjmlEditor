@@ -46,6 +46,12 @@ public sealed class EmailTemplateEditorBlockDocument
     [BsonRepresentation(BsonType.String)]
     public EmailTemplateEditorTextDecoration? TextDecoration { get; init; }
 
+    [BsonRepresentation(BsonType.String)]
+    public EmailTemplateEditorBlockLayout? Layout { get; init; }
+
+    [BsonRepresentation(BsonType.String)]
+    public EmailTemplateEditorBlockActionPlacement? ActionPlacement { get; init; }
+
     public int? Spacing { get; init; }
 
     public string? DividerColor { get; init; }

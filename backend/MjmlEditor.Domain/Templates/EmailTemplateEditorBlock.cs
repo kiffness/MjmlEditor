@@ -38,6 +38,10 @@ public sealed class EmailTemplateEditorBlock
 
     public EmailTemplateEditorTextDecoration? TextDecoration { get; }
 
+    public EmailTemplateEditorBlockLayout? Layout { get; }
+
+    public EmailTemplateEditorBlockActionPlacement? ActionPlacement { get; }
+
     public int? Spacing { get; }
 
     public string? DividerColor { get; }
@@ -73,6 +77,8 @@ public sealed class EmailTemplateEditorBlock
         int? letterSpacing,
         EmailTemplateEditorTextTransform? textTransform,
         EmailTemplateEditorTextDecoration? textDecoration,
+        EmailTemplateEditorBlockLayout? layout,
+        EmailTemplateEditorBlockActionPlacement? actionPlacement,
         int? spacing,
         string? dividerColor,
         int? dividerThickness,
@@ -86,6 +92,8 @@ public sealed class EmailTemplateEditorBlock
         ValidateAlignment(alignment);
         ValidateTextTransform(textTransform);
         ValidateTextDecoration(textDecoration);
+        ValidateLayout(layout);
+        ValidateActionPlacement(actionPlacement);
         ValidateOptionalPositive(fontSize, nameof(fontSize));
         ValidateOptionalPositive(lineHeight, nameof(lineHeight));
         ValidateOptionalNonNegative(letterSpacing, nameof(letterSpacing));
@@ -137,6 +145,8 @@ public sealed class EmailTemplateEditorBlock
             letterSpacing,
             textTransform,
             textDecoration,
+            layout,
+            actionPlacement,
             spacing,
             normalizedDividerColor,
             dividerThickness,
@@ -166,6 +176,8 @@ public sealed class EmailTemplateEditorBlock
         int? letterSpacing,
         EmailTemplateEditorTextTransform? textTransform,
         EmailTemplateEditorTextDecoration? textDecoration,
+        EmailTemplateEditorBlockLayout? layout,
+        EmailTemplateEditorBlockActionPlacement? actionPlacement,
         int? spacing,
         string? dividerColor,
         int? dividerThickness,
@@ -194,6 +206,8 @@ public sealed class EmailTemplateEditorBlock
             letterSpacing,
             textTransform,
             textDecoration,
+            layout,
+            actionPlacement,
             spacing,
             dividerColor,
             dividerThickness,
@@ -225,6 +239,8 @@ public sealed class EmailTemplateEditorBlock
             LetterSpacing,
             TextTransform,
             TextDecoration,
+            Layout,
+            ActionPlacement,
             Spacing,
             DividerColor,
             DividerThickness,
@@ -254,6 +270,8 @@ public sealed class EmailTemplateEditorBlock
         int? letterSpacing,
         EmailTemplateEditorTextTransform? textTransform,
         EmailTemplateEditorTextDecoration? textDecoration,
+        EmailTemplateEditorBlockLayout? layout,
+        EmailTemplateEditorBlockActionPlacement? actionPlacement,
         int? spacing,
         string? dividerColor,
         int? dividerThickness,
@@ -281,6 +299,8 @@ public sealed class EmailTemplateEditorBlock
         LetterSpacing = letterSpacing;
         TextTransform = textTransform;
         TextDecoration = textDecoration;
+        Layout = layout;
+        ActionPlacement = actionPlacement;
         Spacing = spacing;
         DividerColor = dividerColor;
         DividerThickness = dividerThickness;
@@ -320,6 +340,22 @@ public sealed class EmailTemplateEditorBlock
         if (textDecoration is not null && !Enum.IsDefined(textDecoration.Value))
         {
             throw new ArgumentOutOfRangeException(nameof(textDecoration), textDecoration, "Unsupported editor text decoration.");
+        }
+    }
+
+    private static void ValidateLayout(EmailTemplateEditorBlockLayout? layout)
+    {
+        if (layout is not null && !Enum.IsDefined(layout.Value))
+        {
+            throw new ArgumentOutOfRangeException(nameof(layout), layout, "Unsupported editor block layout.");
+        }
+    }
+
+    private static void ValidateActionPlacement(EmailTemplateEditorBlockActionPlacement? actionPlacement)
+    {
+        if (actionPlacement is not null && !Enum.IsDefined(actionPlacement.Value))
+        {
+            throw new ArgumentOutOfRangeException(nameof(actionPlacement), actionPlacement, "Unsupported editor action placement.");
         }
     }
 

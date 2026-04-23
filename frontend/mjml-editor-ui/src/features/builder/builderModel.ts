@@ -1,7 +1,9 @@
 import type {
   EditorAlignment,
+  EditorBlockActionPlacement,
   EditorBlock,
   EditorBlockItem,
+  EditorBlockLayout,
   EditorBlockType,
   EditorDocument,
   EditorSection,
@@ -20,7 +22,7 @@ export type TemplateDraft = {
   editorDocument: EditorDocument | null
 }
 
-export type BuilderSidebarTab = 'blocks' | 'sections' | 'presets' | 'styles'
+export type BuilderSidebarTab = 'blocks' | 'sections' | 'presets' | 'styles' | 'layers'
 
 export type BuilderPreset = 'hero' | 'announcement' | 'image-left-text-right' | 'image-right-text-left' | 'three-up-features'
 
@@ -43,6 +45,7 @@ export const builderTabs: { id: BuilderSidebarTab; label: string }[] = [
   { id: 'sections', label: 'Sections' },
   { id: 'presets', label: 'Presets' },
   { id: 'styles', label: 'Styles' },
+  { id: 'layers', label: 'Layers' },
 ]
 
 export const builderBlockPalette: { type: EditorBlockType; label: string; description: string }[] = [
@@ -93,6 +96,15 @@ export const textDecorationOptions: { value: EditorTextDecoration; label: string
   { value: 'None', label: 'None' },
   { value: 'Underline', label: 'Underline' },
   { value: 'LineThrough', label: 'Line through' },
+]
+export const blockLayoutOptions: { value: EditorBlockLayout; label: string }[] = [
+  { value: 'Vertical', label: 'Vertical / stacked' },
+  { value: 'Horizontal', label: 'Horizontal' },
+  { value: 'HorizontalReverse', label: 'Horizontal reverse' },
+]
+export const actionPlacementOptions: { value: EditorBlockActionPlacement; label: string }[] = [
+  { value: 'AfterContent', label: 'After content' },
+  { value: 'BeforeContent', label: 'Before content' },
 ]
 export const columnVerticalAlignmentOptions: { value: EditorVerticalAlignment; label: string }[] = [
   { value: 'Top', label: 'Top' },
@@ -206,6 +218,24 @@ export function getBlockTextStyle(block: EditorBlock, defaults: { color: string;
   } as const
 }
 
+export function getBlockLayout(block: EditorBlock): EditorBlockLayout {
+  if (block.layout) {
+    return block.layout
+  }
+
+  switch (block.type) {
+    case 'SocialLinks':
+    case 'IconText':
+      return 'Horizontal'
+    default:
+      return 'Vertical'
+  }
+}
+
+export function getBlockActionPlacement(block: EditorBlock): EditorBlockActionPlacement {
+  return block.actionPlacement ?? 'AfterContent'
+}
+
 export function toBlockLabel(type: EditorBlockType) {
   return builderBlockPalette.find((block) => block.type === type)?.label ?? type
 }
@@ -273,6 +303,8 @@ export function createDefaultBlock(type: EditorBlockType): EditorBlock {
         backgroundColor: '#ffffff',
         textColor: '#0f172a',
         alignment: 'Left',
+        layout: 'Vertical',
+        actionPlacement: 'AfterContent',
         borderColor: '#dbe4f0',
         borderWidth: 1,
         borderRadius: 20,
@@ -286,6 +318,7 @@ export function createDefaultBlock(type: EditorBlockType): EditorBlock {
         backgroundColor: '#eff6ff',
         textColor: '#1d4ed8',
         alignment: 'Center',
+        layout: 'Vertical',
         fontWeight: '700',
         fontSize: 18,
         lineHeight: 26,
@@ -303,6 +336,7 @@ export function createDefaultBlock(type: EditorBlockType): EditorBlock {
         secondaryText: 'Ideal for buyers looking for easy daily access.',
         textColor: '#334155',
         alignment: 'Left',
+        layout: 'Horizontal',
         fontSize: 15,
         lineHeight: 22,
       }
@@ -317,6 +351,8 @@ export function createDefaultBlock(type: EditorBlockType): EditorBlock {
         backgroundColor: '#0f172a',
         textColor: '#ffffff',
         alignment: 'Left',
+        layout: 'Vertical',
+        actionPlacement: 'AfterContent',
         fontWeight: '700',
         fontSize: 20,
         lineHeight: 28,
@@ -361,6 +397,7 @@ export function createDefaultBlock(type: EditorBlockType): EditorBlock {
         id: createId('links'),
         type,
         alignment: 'Left',
+        layout: 'Vertical',
         textColor: '#2563eb',
         fontSize: 14,
         items: [
@@ -374,6 +411,7 @@ export function createDefaultBlock(type: EditorBlockType): EditorBlock {
         id: createId('social'),
         type,
         alignment: 'Center',
+        layout: 'Horizontal',
         textColor: '#2563eb',
         fontSize: 14,
         items: [

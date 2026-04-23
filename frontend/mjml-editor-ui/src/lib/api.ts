@@ -42,6 +42,8 @@ export type EditorAlignment = 'Left' | 'Center' | 'Right'
 export type EditorVerticalAlignment = 'Top' | 'Middle' | 'Bottom'
 export type EditorTextTransform = 'None' | 'Uppercase' | 'Lowercase' | 'Capitalize'
 export type EditorTextDecoration = 'None' | 'Underline' | 'LineThrough'
+export type EditorBlockLayout = 'Vertical' | 'Horizontal' | 'HorizontalReverse'
+export type EditorBlockActionPlacement = 'BeforeContent' | 'AfterContent'
 
 export type EditorBlockType =
   | 'Hero'
@@ -86,6 +88,8 @@ export type EditorBlock = {
   letterSpacing?: number | null
   textTransform?: EditorTextTransform | null
   textDecoration?: EditorTextDecoration | null
+  layout?: EditorBlockLayout | null
+  actionPlacement?: EditorBlockActionPlacement | null
   spacing?: number | null
   dividerColor?: string | null
   dividerThickness?: number | null

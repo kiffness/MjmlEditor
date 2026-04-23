@@ -192,6 +192,16 @@ public static class EmailTemplateValidation
                         errors.Add(new ValidationError($"{fieldPrefix}.TextDecoration", "A supported text decoration is required."));
                     }
 
+                    if (block.Layout is not null && !Enum.IsDefined(block.Layout.Value))
+                    {
+                        errors.Add(new ValidationError($"{fieldPrefix}.Layout", "A supported block layout is required."));
+                    }
+
+                    if (block.ActionPlacement is not null && !Enum.IsDefined(block.ActionPlacement.Value))
+                    {
+                        errors.Add(new ValidationError($"{fieldPrefix}.ActionPlacement", "A supported action placement is required."));
+                    }
+
                     if (block.FontSize is not null && block.FontSize <= 0)
                     {
                         errors.Add(new ValidationError($"{fieldPrefix}.FontSize", "FontSize must be positive when provided."));

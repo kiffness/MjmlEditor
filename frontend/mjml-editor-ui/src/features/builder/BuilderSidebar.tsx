@@ -1,7 +1,9 @@
 import type {
   EditorAlignment,
+  EditorBlockActionPlacement,
   EditorBlock,
   EditorBlockItem,
+  EditorBlockLayout,
   EditorBlockType,
   EditorColumn,
   EditorSection,
@@ -10,6 +12,8 @@ import type {
   EditorVerticalAlignment,
 } from '../../lib/api'
 import {
+  actionPlacementOptions,
+  blockLayoutOptions,
   builderBlockPalette,
   builderPresetOptions,
   builderSectionOptions,
@@ -207,6 +211,54 @@ function BlockPaletteIcon({ type }: { type: EditorBlockType }) {
   }
 }
 
+function toLayoutLabel(type: EditorBlockType, value: EditorBlockLayout) {
+  if (type === 'PropertyCard') {
+    return value === 'Vertical'
+      ? 'Stacked image'
+      : value === 'Horizontal'
+        ? 'Image left'
+        : 'Image right'
+  }
+
+  if (type === 'IconText') {
+    return value === 'Vertical'
+      ? 'Icon top'
+      : value === 'Horizontal'
+        ? 'Icon left'
+        : 'Icon right'
+  }
+
+  if (type === 'PromoBanner') {
+    return value === 'Vertical'
+      ? 'Stacked'
+      : value === 'Horizontal'
+        ? 'Copy left / CTA right'
+        : 'CTA left / copy right'
+  }
+
+  if (type === 'FeatureCard') {
+    return value === 'Vertical'
+      ? 'Stacked'
+      : value === 'Horizontal'
+        ? 'Title left / detail right'
+        : 'Detail left / title right'
+  }
+
+  return value === 'Vertical'
+    ? 'Vertical'
+    : value === 'Horizontal'
+      ? 'Horizontal'
+      : 'Horizontal reverse'
+}
+
+function toActionPlacementLabel(type: EditorBlockType, value: EditorBlockActionPlacement) {
+  if (type === 'PromoBanner') {
+    return value === 'BeforeContent' ? 'CTA before copy' : 'CTA after copy'
+  }
+
+  return value === 'BeforeContent' ? 'CTA before details' : 'CTA after details'
+}
+
 function SectionLayoutIcon({ columns }: { columns: number }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
@@ -266,6 +318,7 @@ type BuilderSidebarProps = {
   selectedBlock: EditorBlock | null
   selectedSectionId: string | null
   selectedColumnId: string | null
+  selectedBlockId: string | null
   handleAddBlock: (type: EditorBlockType) => void
   handlePaletteBlockDragStart: (type: EditorBlockType) => void
   handleAddSection: (columnCount: number) => void
@@ -279,6 +332,7 @@ type BuilderSidebarProps = {
   handleRemoveSelectedBlockItem: (itemId: string) => void
   handleSelectSection: (sectionId: string) => void
   handleSelectColumn: (sectionId: string, columnId: string) => void
+  handleSelectBlock: (sectionId: string, columnId: string, blockId: string) => void
   handleStartBuilder: (preset?: BuilderPreset) => void
   clearDragState: () => void
 }
@@ -292,6 +346,7 @@ export function BuilderSidebar({
   selectedBlock,
   selectedSectionId,
   selectedColumnId,
+  selectedBlockId,
   handleAddBlock,
   handlePaletteBlockDragStart,
   handleAddSection,
@@ -305,6 +360,7 @@ export function BuilderSidebar({
   handleRemoveSelectedBlockItem,
   handleSelectSection,
   handleSelectColumn,
+  handleSelectBlock,
   handleStartBuilder,
   clearDragState,
 }: BuilderSidebarProps) {
@@ -714,6 +770,83 @@ export function BuilderSidebar({
             </div>
           )}
 
+          {activeBuilderTab === 'layers' && (
+            <div className="space-y-4">
+              {!draft.editorDocument ? (
+                <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-5 text-sm text-slate-400">
+                  Start the builder to inspect sections, columns, and blocks.
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-slate-400">
+                    Jump through the document structure and select exactly what you want to edit.
+                  </p>
+                  <div className="space-y-3">
+                    {draft.editorDocument.sections.map((section, sectionIndex) => (
+                      <div key={section.id} className="rounded-2xl border border-white/10 bg-slate-950/50 p-3">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectSection(section.id)}
+                          className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                            selectedSectionId === section.id
+                              ? 'border-sky-400/50 bg-sky-500/10'
+                              : 'border-white/10 bg-slate-950/60 hover:border-white/20 hover:bg-slate-900'
+                          }`}
+                        >
+                          <span className="block text-sm font-semibold text-white">Section {sectionIndex + 1}</span>
+                          <span className="mt-1 block text-xs text-slate-400">
+                            {section.columns.length} column{section.columns.length === 1 ? '' : 's'}
+                          </span>
+                        </button>
+
+                        <div className="mt-3 space-y-2 pl-3">
+                          {section.columns.map((column, columnIndex) => (
+                            <div key={column.id} className="space-y-2">
+                              <button
+                                type="button"
+                                onClick={() => handleSelectColumn(section.id, column.id)}
+                                className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                                  selectedColumnId === column.id
+                                    ? 'border-violet-400/50 bg-violet-500/10'
+                                    : 'border-white/10 bg-slate-950/60 hover:border-white/20 hover:bg-slate-900'
+                                }`}
+                              >
+                                <span className="block text-sm font-semibold text-white">Column {columnIndex + 1}</span>
+                                <span className="mt-1 block text-xs text-slate-400">
+                                  {column.blocks.length} block{column.blocks.length === 1 ? '' : 's'}
+                                </span>
+                              </button>
+
+                              <div className="space-y-2 pl-3">
+                                {column.blocks.map((block, blockIndex) => (
+                                  <button
+                                    key={block.id}
+                                    type="button"
+                                    onClick={() => handleSelectBlock(section.id, column.id, block.id)}
+                                    className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
+                                      selectedBlockId === block.id
+                                        ? 'border-emerald-400/50 bg-emerald-500/10'
+                                        : 'border-white/10 bg-slate-950/60 hover:border-white/20 hover:bg-slate-900'
+                                    }`}
+                                  >
+                                    <span className="block text-sm font-semibold text-white">
+                                      {blockIndex + 1}. {toBlockLabel(block.type)}
+                                    </span>
+                                    <span className="mt-1 block text-xs text-slate-400">{block.id}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           {activeBuilderTab === 'styles' && (
             <div className="space-y-4">
               {!selectedSection && !selectedColumn && !selectedBlock ? (
@@ -821,6 +954,49 @@ export function BuilderSidebar({
                               <option value="Left">Left</option>
                               <option value="Center">Center</option>
                               <option value="Right">Right</option>
+                            </select>
+                          </label>
+                        )}
+
+                        {['LinkList', 'SocialLinks', 'PropertyCard', 'FeatureCard', 'IconText', 'PromoBanner'].includes(selectedBlock.type) && (
+                          <label className="block">
+                            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                              Layout
+                            </span>
+                            <select
+                              value={selectedBlock.layout ?? (selectedBlock.type === 'SocialLinks' || selectedBlock.type === 'IconText' ? 'Horizontal' : 'Vertical')}
+                              onChange={(event) => handleUpdateSelectedBlock({ layout: event.target.value as EditorBlockLayout })}
+                              className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
+                            >
+                              {blockLayoutOptions
+                                .filter((option) => (
+                                  ['PropertyCard', 'FeatureCard', 'IconText', 'PromoBanner'].includes(selectedBlock.type)
+                                  || option.value !== 'HorizontalReverse'
+                                ))
+                                .map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {toLayoutLabel(selectedBlock.type, option.value)}
+                                  </option>
+                                ))}
+                            </select>
+                          </label>
+                        )}
+
+                        {['PropertyCard', 'PromoBanner'].includes(selectedBlock.type) && (
+                          <label className="block">
+                            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                              CTA placement
+                            </span>
+                            <select
+                              value={selectedBlock.actionPlacement ?? 'AfterContent'}
+                              onChange={(event) => handleUpdateSelectedBlock({ actionPlacement: event.target.value as EditorBlockActionPlacement })}
+                              className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
+                            >
+                              {actionPlacementOptions.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {toActionPlacementLabel(selectedBlock.type, option.value)}
+                                </option>
+                              ))}
                             </select>
                           </label>
                         )}

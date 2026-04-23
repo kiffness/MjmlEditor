@@ -3,7 +3,9 @@ import {
   type BuilderPreset,
   type DraggedBlock,
   type TemplateDraft,
+  getBlockActionPlacement,
   getBlockFrameStyle,
+  getBlockLayout,
   getBlockTextStyle,
   isCanvasDraggedBlock,
   toColumnJustify,
@@ -37,6 +39,43 @@ function CanvasActionButton({
   )
 }
 
+function InlineCanvasInput({
+  value,
+  placeholder,
+  multiline = false,
+  onChange,
+}: {
+  value: string
+  placeholder: string
+  multiline?: boolean
+  onChange: (value: string) => void
+}) {
+  const sharedClassName = 'w-full rounded-xl border border-sky-200 bg-white/95 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20'
+
+  if (multiline) {
+    return (
+      <textarea
+        value={value}
+        placeholder={placeholder}
+        onClick={(event) => event.stopPropagation()}
+        onChange={(event) => onChange(event.target.value)}
+        className={`${sharedClassName} min-h-[84px] resize-y`}
+      />
+    )
+  }
+
+  return (
+    <input
+      type="text"
+      value={value}
+      placeholder={placeholder}
+      onClick={(event) => event.stopPropagation()}
+      onChange={(event) => onChange(event.target.value)}
+      className={sharedClassName}
+    />
+  )
+}
+
 type BuilderCanvasProps = {
   draft: TemplateDraft
   selectedSectionId: string | null
@@ -65,6 +104,11 @@ type BuilderCanvasProps = {
   handleDeleteSection: (sectionId: string) => void
   handleDuplicateBlock: (sectionId: string, columnId: string, blockId: string) => void
   handleDeleteBlock: (sectionId: string, columnId: string, blockId: string) => void
+  canUndo: boolean
+  canRedo: boolean
+  handleUndo: () => void
+  handleRedo: () => void
+  handleUpdateSelectedBlock: (changes: Partial<EditorBlock>) => void
 }
 
 export function BuilderCanvas({
@@ -95,6 +139,11 @@ export function BuilderCanvas({
   handleDeleteSection,
   handleDuplicateBlock,
   handleDeleteBlock,
+  canUndo,
+  canRedo,
+  handleUndo,
+  handleRedo,
+  handleUpdateSelectedBlock,
 }: BuilderCanvasProps) {
   if (!draft.editorDocument) {
     return (
@@ -142,6 +191,24 @@ export function BuilderCanvas({
         <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-semibold text-slate-300">
           {draft.editorDocument.sections.length} section{draft.editorDocument.sections.length === 1 ? '' : 's'}
         </span>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleUndo}
+            disabled={!canUndo}
+            className="rounded-xl border border-white/10 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/5 disabled:cursor-not-allowed disabled:border-white/5 disabled:text-slate-500"
+          >
+            Undo
+          </button>
+          <button
+            type="button"
+            onClick={handleRedo}
+            disabled={!canRedo}
+            className="rounded-xl border border-white/10 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/5 disabled:cursor-not-allowed disabled:border-white/5 disabled:text-slate-500"
+          >
+            Redo
+          </button>
+        </div>
       </div>
 
       <div className="mt-6 min-h-[720px] rounded-[28px] border border-white/10 bg-slate-950/60 p-5">
@@ -368,7 +435,7 @@ export function BuilderCanvas({
                                           <CanvasActionButton label="Delete" tone="danger" onClick={() => handleDeleteBlock(section.id, column.id, block.id)} />
                                         </div>
                                       )}
-                                      <CanvasBlockPreview block={block} />
+                                      <CanvasBlockPreview block={block} isSelected={isBlockSelected} onUpdateBlock={handleUpdateSelectedBlock} />
                                     </div>
                                   </div>
                                 )
@@ -397,17 +464,49 @@ export function BuilderCanvas({
   )
 }
 
-function CanvasBlockPreview({ block }: { block: EditorBlock }) {
+function CanvasBlockPreview({
+  block,
+  isSelected,
+  onUpdateBlock,
+}: {
+  block: EditorBlock
+  isSelected: boolean
+  onUpdateBlock: (changes: Partial<EditorBlock>) => void
+}) {
   const frameStyle = getBlockFrameStyle(block)
   const contentWidth = block.widthPercentage ? `${block.widthPercentage}%` : '100%'
+  const layout = getBlockLayout(block)
+  const actionPlacement = getBlockActionPlacement(block)
+
+  function renderActionChip(inverse = false) {
+    if (!block.actionLabel && !block.actionUrl) {
+      return null
+    }
+
+    return (
+      <div className="flex" style={{ justifyContent: toFlexJustify(block.alignment) }}>
+        <span
+          className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${inverse ? 'bg-white text-slate-950' : 'bg-slate-900 text-white'}`}
+        >
+          {block.actionLabel || 'Learn more'}
+        </span>
+      </div>
+    )
+  }
 
   if (block.type === 'Hero') {
     return (
       <div style={frameStyle} className="rounded-2xl px-1 py-1">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Heading</p>
-        <p className="mt-2" style={getBlockTextStyle(block, { color: '#1f2937', fontSize: 24, fontWeight: '700' })}>
-          {block.textContent}
-        </p>
+        {isSelected ? (
+          <div className="mt-3">
+            <InlineCanvasInput value={block.textContent ?? ''} placeholder="Heading" onChange={(value) => onUpdateBlock({ textContent: value })} />
+          </div>
+        ) : (
+          <p className="mt-2" style={getBlockTextStyle(block, { color: '#1f2937', fontSize: 24, fontWeight: '700' })}>
+            {block.textContent}
+          </p>
+        )}
       </div>
     )
   }
@@ -416,9 +515,15 @@ function CanvasBlockPreview({ block }: { block: EditorBlock }) {
     return (
       <div style={frameStyle} className="rounded-2xl px-1 py-1">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Paragraph</p>
-        <p className="mt-2" style={getBlockTextStyle(block, { color: '#475569', fontSize: 16 })}>
-          {block.textContent}
-        </p>
+        {isSelected ? (
+          <div className="mt-3">
+            <InlineCanvasInput multiline value={block.textContent ?? ''} placeholder="Paragraph copy" onChange={(value) => onUpdateBlock({ textContent: value })} />
+          </div>
+        ) : (
+          <p className="mt-2" style={getBlockTextStyle(block, { color: '#475569', fontSize: 16 })}>
+            {block.textContent}
+          </p>
+        )}
       </div>
     )
   }
@@ -468,6 +573,43 @@ function CanvasBlockPreview({ block }: { block: EditorBlock }) {
   }
 
   if (block.type === 'PropertyCard') {
+    const action = renderActionChip()
+    const details = (
+      <div className="min-w-0 flex-1">
+        {actionPlacement === 'BeforeContent' && action && <div className="mb-4">{action}</div>}
+        {isSelected ? (
+          <div className="space-y-3">
+            <InlineCanvasInput value={block.textContent ?? ''} placeholder="Property title" onChange={(value) => onUpdateBlock({ textContent: value })} />
+            <InlineCanvasInput value={block.secondaryText ?? ''} placeholder="Property details" onChange={(value) => onUpdateBlock({ secondaryText: value })} />
+            <InlineCanvasInput value={block.actionLabel ?? ''} placeholder="Button label" onChange={(value) => onUpdateBlock({ actionLabel: value })} />
+          </div>
+        ) : (
+          <>
+            <p style={getBlockTextStyle(block, { color: '#0f172a', fontSize: 20, fontWeight: '700' })}>
+              {block.textContent || 'Property title'}
+            </p>
+            {block.secondaryText && (
+              <p className="mt-2 text-sm text-slate-500">{block.secondaryText}</p>
+            )}
+          </>
+        )}
+        {actionPlacement === 'AfterContent' && action && <div className="mt-4">{action}</div>}
+      </div>
+    )
+    const media = (
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+        {block.imageUrl ? (
+          <img
+            src={block.imageUrl}
+            alt={block.altText ?? 'Featured property'}
+            className={layout === 'Vertical' ? 'h-40 w-full object-cover' : 'h-full min-h-48 w-full object-cover'}
+          />
+        ) : (
+          <div className="flex h-40 items-center justify-center text-sm text-slate-500">No property image</div>
+        )}
+      </div>
+    )
+
     return (
       <div
         className="overflow-hidden rounded-3xl"
@@ -480,27 +622,12 @@ function CanvasBlockPreview({ block }: { block: EditorBlock }) {
         }}
       >
         <p className="px-5 pt-5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Property card</p>
-        <div className="px-5 pb-5 pt-3">
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-            {block.imageUrl ? (
-              <img src={block.imageUrl} alt={block.altText ?? 'Featured property'} className="h-40 w-full object-cover" />
-            ) : (
-              <div className="flex h-40 items-center justify-center text-sm text-slate-500">No property image</div>
-            )}
-          </div>
-          <p className="mt-4" style={getBlockTextStyle(block, { color: '#0f172a', fontSize: 20, fontWeight: '700' })}>
-            {block.textContent || 'Property title'}
-          </p>
-          {block.secondaryText && (
-            <p className="mt-2 text-sm text-slate-500">{block.secondaryText}</p>
-          )}
-          {(block.actionLabel || block.actionUrl) && (
-            <div className="mt-4 flex" style={{ justifyContent: toFlexJustify(block.alignment) }}>
-              <span className="inline-flex rounded-full bg-slate-900 px-4 py-2 text-sm font-semibold text-white">
-                {block.actionLabel || 'View property'}
-              </span>
-            </div>
-          )}
+        <div className={`px-5 pb-5 pt-3 ${layout === 'Vertical' ? 'space-y-4' : 'grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4'}`}>
+          {layout === 'HorizontalReverse'
+            ? <>{details}{media}</>
+            : layout === 'Horizontal'
+              ? <>{media}{details}</>
+              : <><div>{media}</div>{details}</>}
         </div>
       </div>
     )
@@ -519,38 +646,92 @@ function CanvasBlockPreview({ block }: { block: EditorBlock }) {
         }}
       >
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Feature card</p>
-        <p className="mt-3" style={getBlockTextStyle(block, { color: '#1d4ed8', fontSize: 18, fontWeight: '700' })}>
-          {block.textContent || 'Feature title'}
-        </p>
-        {block.secondaryText && <p className="mt-2 text-sm text-slate-600">{block.secondaryText}</p>}
+        {isSelected ? (
+          <div className="mt-3 space-y-3">
+            <InlineCanvasInput value={block.textContent ?? ''} placeholder="Feature title" onChange={(value) => onUpdateBlock({ textContent: value })} />
+            <InlineCanvasInput value={block.secondaryText ?? ''} placeholder="Feature detail" onChange={(value) => onUpdateBlock({ secondaryText: value })} />
+          </div>
+        ) : layout === 'Vertical' ? (
+          <>
+            <p className="mt-3" style={getBlockTextStyle(block, { color: '#1d4ed8', fontSize: 18, fontWeight: '700' })}>
+              {block.textContent || 'Feature title'}
+            </p>
+            {block.secondaryText && <p className="mt-2 text-sm text-slate-600">{block.secondaryText}</p>}
+          </>
+        ) : (
+          <div className="mt-3 grid grid-cols-2 gap-3">
+            {layout === 'HorizontalReverse'
+              ? <><p className="text-sm text-slate-600">{block.secondaryText}</p><p style={getBlockTextStyle(block, { color: '#1d4ed8', fontSize: 18, fontWeight: '700' })}>{block.textContent || 'Feature title'}</p></>
+              : <><p style={getBlockTextStyle(block, { color: '#1d4ed8', fontSize: 18, fontWeight: '700' })}>{block.textContent || 'Feature title'}</p><p className="text-sm text-slate-600">{block.secondaryText}</p></>}
+          </div>
+        )}
       </div>
     )
   }
 
   if (block.type === 'IconText') {
-    return (
-      <div style={frameStyle} className="rounded-2xl px-1 py-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Icon + text</p>
-        <div className="mt-3 flex items-start gap-4">
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-            {block.imageUrl ? (
-              <img src={block.imageUrl} alt={block.altText ?? 'Feature icon'} className="h-full w-full object-cover" />
-            ) : (
-              <span className="text-xs text-slate-500">Icon</span>
-            )}
+    const media = (
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+        {block.imageUrl ? (
+          <img src={block.imageUrl} alt={block.altText ?? 'Feature icon'} className="h-full w-full object-cover" />
+        ) : (
+          <span className="text-xs text-slate-500">Icon</span>
+        )}
+      </div>
+    )
+    const content = (
+      <div className="min-w-0 flex-1">
+        {isSelected ? (
+          <div className="space-y-3">
+            <InlineCanvasInput value={block.textContent ?? ''} placeholder="Amenity title" onChange={(value) => onUpdateBlock({ textContent: value })} />
+            <InlineCanvasInput multiline value={block.secondaryText ?? ''} placeholder="Amenity detail" onChange={(value) => onUpdateBlock({ secondaryText: value })} />
           </div>
-          <div className="min-w-0 flex-1">
+        ) : (
+          <>
             <p style={getBlockTextStyle(block, { color: '#0f172a', fontSize: 16, fontWeight: '700' })}>
               {block.textContent || 'Amenity title'}
             </p>
             {block.secondaryText && <p className="mt-1 text-sm text-slate-500">{block.secondaryText}</p>}
-          </div>
+          </>
+        )}
+      </div>
+    )
+
+    return (
+      <div style={frameStyle} className="rounded-2xl px-1 py-1">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Icon + text</p>
+        <div className={`mt-3 ${layout === 'Vertical' ? 'space-y-3' : 'flex items-start gap-4'}`}>
+          {layout === 'HorizontalReverse'
+            ? <>{content}{media}</>
+            : layout === 'Horizontal'
+              ? <>{media}{content}</>
+              : <><div>{media}</div>{content}</>}
         </div>
       </div>
     )
   }
 
   if (block.type === 'PromoBanner') {
+    const action = renderActionChip(true)
+    const copy = (
+      <div className="min-w-0 flex-1">
+        {isSelected ? (
+          <div className="space-y-3">
+            <InlineCanvasInput value={block.textContent ?? ''} placeholder="Promotion headline" onChange={(value) => onUpdateBlock({ textContent: value })} />
+            <InlineCanvasInput value={block.secondaryText ?? ''} placeholder="Promotion detail" onChange={(value) => onUpdateBlock({ secondaryText: value })} />
+            <InlineCanvasInput value={block.actionLabel ?? ''} placeholder="CTA label" onChange={(value) => onUpdateBlock({ actionLabel: value })} />
+          </div>
+        ) : (
+          <>
+            <p style={getBlockTextStyle(block, { color: '#ffffff', fontSize: 20, fontWeight: '700' })}>
+              {block.textContent || 'Promotion headline'}
+            </p>
+            {block.secondaryText && <p className="mt-2 text-sm text-slate-300">{block.secondaryText}</p>}
+          </>
+        )}
+      </div>
+    )
+
     return (
       <div
         className="rounded-3xl px-5 py-5"
@@ -563,15 +744,17 @@ function CanvasBlockPreview({ block }: { block: EditorBlock }) {
         }}
       >
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Promo banner</p>
-        <p className="mt-3" style={getBlockTextStyle(block, { color: '#ffffff', fontSize: 20, fontWeight: '700' })}>
-          {block.textContent || 'Promotion headline'}
-        </p>
-        {block.secondaryText && <p className="mt-2 text-sm text-slate-300">{block.secondaryText}</p>}
-        {(block.actionLabel || block.actionUrl) && (
-          <div className="mt-4 flex" style={{ justifyContent: toFlexJustify(block.alignment) }}>
-            <span className="inline-flex rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950">
-              {block.actionLabel || 'Learn more'}
-            </span>
+        {layout === 'Vertical' ? (
+          <div className="mt-3 space-y-4">
+            {actionPlacement === 'BeforeContent' && action}
+            {copy}
+            {actionPlacement === 'AfterContent' && action}
+          </div>
+        ) : (
+          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
+            {layout === 'HorizontalReverse'
+              ? <>{action}{copy}</>
+              : <>{copy}{action}</>}
           </div>
         )}
       </div>
@@ -582,23 +765,29 @@ function CanvasBlockPreview({ block }: { block: EditorBlock }) {
     return (
       <div style={frameStyle} className="rounded-2xl px-1 py-1">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Button</p>
-        <div className="mt-3 flex" style={{ justifyContent: toFlexJustify(block.alignment) }}>
-          <span
-            className="inline-flex px-4 py-2 text-sm"
-            style={{
-              backgroundColor: block.backgroundColor ?? '#2563eb',
-              borderRadius: block.borderRadius ?? 12,
-              borderColor: block.borderColor ?? undefined,
-              borderWidth: block.borderWidth ?? undefined,
-              borderStyle: block.borderWidth ? 'solid' : undefined,
-              width: contentWidth,
-              justifyContent: 'center',
-              ...getBlockTextStyle(block, { color: '#ffffff', fontSize: 14, fontWeight: '600' }),
-            }}
-          >
-            {block.actionLabel || 'Button'}
-          </span>
-        </div>
+        {isSelected ? (
+          <div className="mt-3">
+            <InlineCanvasInput value={block.actionLabel ?? ''} placeholder="Button label" onChange={(value) => onUpdateBlock({ actionLabel: value })} />
+          </div>
+        ) : (
+          <div className="mt-3 flex" style={{ justifyContent: toFlexJustify(block.alignment) }}>
+            <span
+              className="inline-flex px-4 py-2 text-sm"
+              style={{
+                backgroundColor: block.backgroundColor ?? '#2563eb',
+                borderRadius: block.borderRadius ?? 12,
+                borderColor: block.borderColor ?? undefined,
+                borderWidth: block.borderWidth ?? undefined,
+                borderStyle: block.borderWidth ? 'solid' : undefined,
+                width: contentWidth,
+                justifyContent: 'center',
+                ...getBlockTextStyle(block, { color: '#ffffff', fontSize: 14, fontWeight: '600' }),
+              }}
+            >
+              {block.actionLabel || 'Button'}
+            </span>
+          </div>
+        )}
       </div>
     )
   }
@@ -607,21 +796,27 @@ function CanvasBlockPreview({ block }: { block: EditorBlock }) {
     return (
       <div style={frameStyle} className="rounded-2xl px-1 py-1">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Badge</p>
-        <div className="mt-3 flex" style={{ justifyContent: toFlexJustify(block.alignment) }}>
-          <span
-            className="inline-flex px-3 py-1 text-xs"
-            style={{
-              backgroundColor: block.backgroundColor ?? '#dbeafe',
-              borderRadius: block.borderRadius ?? 999,
-              borderColor: block.borderColor ?? undefined,
-              borderWidth: block.borderWidth ?? undefined,
-              borderStyle: block.borderWidth ? 'solid' : undefined,
-              ...getBlockTextStyle(block, { color: '#1d4ed8', fontSize: 13, fontWeight: '600' }),
-            }}
-          >
-            {block.textContent || 'Badge'}
-          </span>
-        </div>
+        {isSelected ? (
+          <div className="mt-3">
+            <InlineCanvasInput value={block.textContent ?? ''} placeholder="Badge text" onChange={(value) => onUpdateBlock({ textContent: value })} />
+          </div>
+        ) : (
+          <div className="mt-3 flex" style={{ justifyContent: toFlexJustify(block.alignment) }}>
+            <span
+              className="inline-flex px-3 py-1 text-xs"
+              style={{
+                backgroundColor: block.backgroundColor ?? '#dbeafe',
+                borderRadius: block.borderRadius ?? 999,
+                borderColor: block.borderColor ?? undefined,
+                borderWidth: block.borderWidth ?? undefined,
+                borderStyle: block.borderWidth ? 'solid' : undefined,
+                ...getBlockTextStyle(block, { color: '#1d4ed8', fontSize: 13, fontWeight: '600' }),
+              }}
+            >
+              {block.textContent || 'Badge'}
+            </span>
+          </div>
+        )}
       </div>
     )
   }
@@ -630,13 +825,22 @@ function CanvasBlockPreview({ block }: { block: EditorBlock }) {
     return (
       <div style={frameStyle} className="rounded-2xl px-1 py-1">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Quote</p>
-        <blockquote
-          className="mt-2 border-l-2 border-slate-200 pl-4 italic"
-          style={getBlockTextStyle(block, { color: '#334155', fontSize: 18 })}
-        >
-          “{block.textContent}”
-        </blockquote>
-        {block.secondaryText && <p className="mt-2 text-sm text-slate-500">{block.secondaryText}</p>}
+        {isSelected ? (
+          <div className="mt-3 space-y-3">
+            <InlineCanvasInput multiline value={block.textContent ?? ''} placeholder="Quote" onChange={(value) => onUpdateBlock({ textContent: value })} />
+            <InlineCanvasInput value={block.secondaryText ?? ''} placeholder="Attribution" onChange={(value) => onUpdateBlock({ secondaryText: value })} />
+          </div>
+        ) : (
+          <>
+            <blockquote
+              className="mt-2 border-l-2 border-slate-200 pl-4 italic"
+              style={getBlockTextStyle(block, { color: '#334155', fontSize: 18 })}
+            >
+              “{block.textContent}”
+            </blockquote>
+            {block.secondaryText && <p className="mt-2 text-sm text-slate-500">{block.secondaryText}</p>}
+          </>
+        )}
       </div>
     )
   }
@@ -645,7 +849,10 @@ function CanvasBlockPreview({ block }: { block: EditorBlock }) {
     return (
       <div style={frameStyle} className="rounded-2xl px-1 py-1">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Link list</p>
-        <div className="mt-3 space-y-2 text-sm font-medium">
+        <div
+          className={layout === 'Vertical' ? 'mt-3 space-y-2 text-sm font-medium' : 'mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm font-medium'}
+          style={layout === 'Vertical' ? undefined : { justifyContent: toFlexJustify(block.alignment) }}
+        >
           {(block.items ?? []).map((item) => (
             <div key={item.id} style={getBlockTextStyle(block, { color: '#2563eb', fontSize: 14, fontWeight: '600' })}>{item.label}</div>
           ))}
@@ -658,11 +865,14 @@ function CanvasBlockPreview({ block }: { block: EditorBlock }) {
     return (
       <div style={frameStyle} className="rounded-2xl px-1 py-1">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Social links</p>
-        <div className="mt-3 flex flex-wrap gap-2" style={{ justifyContent: toFlexJustify(block.alignment) }}>
+        <div
+          className={layout === 'Vertical' ? 'mt-3 space-y-2' : 'mt-3 flex flex-wrap gap-2'}
+          style={layout === 'Vertical' ? undefined : { justifyContent: toFlexJustify(block.alignment) }}
+        >
           {(block.items ?? []).map((item) => (
             <span
               key={item.id}
-              className="rounded-full border border-slate-200 px-3 py-1 text-xs"
+              className="inline-flex rounded-full border border-slate-200 px-3 py-1 text-xs"
               style={getBlockTextStyle(block, { color: '#2563eb', fontSize: 14, fontWeight: '600' })}
             >
               {item.label}
@@ -677,8 +887,17 @@ function CanvasBlockPreview({ block }: { block: EditorBlock }) {
     return (
       <div style={frameStyle} className="rounded-2xl px-1 py-1">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Footer / legal</p>
-        <p className="mt-2" style={getBlockTextStyle(block, { color: '#64748b', fontSize: 12 })}>{block.textContent}</p>
-        {block.secondaryText && <p className="mt-1 text-xs text-slate-400">{block.secondaryText}</p>}
+        {isSelected ? (
+          <div className="mt-3 space-y-3">
+            <InlineCanvasInput multiline value={block.textContent ?? ''} placeholder="Footer copy" onChange={(value) => onUpdateBlock({ textContent: value })} />
+            <InlineCanvasInput value={block.secondaryText ?? ''} placeholder="Secondary line" onChange={(value) => onUpdateBlock({ secondaryText: value })} />
+          </div>
+        ) : (
+          <>
+            <p className="mt-2" style={getBlockTextStyle(block, { color: '#64748b', fontSize: 12 })}>{block.textContent}</p>
+            {block.secondaryText && <p className="mt-1 text-xs text-slate-400">{block.secondaryText}</p>}
+          </>
+        )}
       </div>
     )
   }
