@@ -4,8 +4,8 @@ import {
   clearStoredAuthToken,
   createTemplate,
   deleteTemplate,
-  type EditorAlignment,
   type EditorBlock,
+  type EditorBlockItem,
   type EditorBlockType,
   type EditorColumn,
   type EditorDocument,
@@ -30,30 +30,34 @@ import {
   type TenantDto,
   updateTemplate,
 } from './lib/api'
+import { BuilderCanvas } from './features/builder/BuilderCanvas'
+import { BuilderSidebar } from './features/builder/BuilderSidebar'
+import {
+  cloneEditorDocument,
+  createDefaultBlock,
+  createDefaultBlockItem,
+  createPresetSections,
+  createSection,
+  createStarterMjml,
+  type BuilderPreset,
+  type BuilderSidebarTab,
+  type DraggedBlock,
+  duplicateBlockWithIds,
+  duplicateSectionWithIds,
+  insertBlock,
+  isCanvasDraggedBlock,
+  isPaletteDraggedBlock,
+  moveItem,
+  serializeEditorDocument,
+  type TemplateDraft,
+  toDraft,
+} from './features/builder/builderModel'
 
 type StatusFilter = 'All' | TemplateStatus
-
-type TemplateDraft = {
-  name: string
-  subject: string
-  status: TemplateStatus
-  mjmlBody: string
-  editorDocument: EditorDocument | null
-}
 
 type AppRoute =
   | { kind: 'library' }
   | { kind: 'editor'; templateId: string }
-
-type BuilderSidebarTab = 'blocks' | 'sections' | 'presets' | 'styles'
-
-type BuilderPreset = 'hero' | 'announcement' | 'image-left-text-right' | 'image-right-text-left' | 'three-up-features'
-
-type DraggedBlock = {
-  sectionId: string
-  columnId: string
-  blockId: string
-}
 
 type PreviewViewport = 'desktop' | 'tablet' | 'mobile'
 
@@ -62,39 +66,6 @@ const sidebarItems = [
   { label: 'Campaign library', count: 7, active: false },
   { label: 'Audience sync', count: 3, active: false },
   { label: 'Activity feed', count: 12, active: false },
-]
-
-const builderTabs: { id: BuilderSidebarTab; label: string }[] = [
-  { id: 'blocks', label: 'Blocks' },
-  { id: 'sections', label: 'Sections' },
-  { id: 'presets', label: 'Presets' },
-  { id: 'styles', label: 'Styles' },
-]
-
-const builderBlockPalette: { type: EditorBlockType; label: string; description: string }[] = [
-  { type: 'Hero', label: 'Heading', description: 'Bold hero heading for campaign openers.' },
-  { type: 'Text', label: 'Paragraph', description: 'Supporting copy or body text.' },
-  { type: 'Image', label: 'Image', description: 'Visual block with image URL and alt text.' },
-  { type: 'Button', label: 'Button', description: 'Primary call-to-action button.' },
-  { type: 'Spacer', label: 'Spacer', description: 'Vertical breathing room between blocks.' },
-  { type: 'Divider', label: 'Divider', description: 'Horizontal rule for section breaks.' },
-]
-
-const builderSectionOptions = [
-  { columns: 1, label: '1 column', description: 'Single-column content section.' },
-  { columns: 2, label: '2 columns', description: 'Split layout for media and copy.' },
-  { columns: 3, label: '3 columns', description: 'Three-up grid for features or offers.' },
-  { columns: 4, label: '4 columns', description: 'Compact grid for product or icon rows.' },
-  { columns: 5, label: '5 columns', description: 'Dense promotional strip for short content.' },
-  { columns: 6, label: '6 columns', description: 'Six-up grid for small highlights or logos.' },
-]
-
-const builderPresetOptions: { id: BuilderPreset; label: string; description: string }[] = [
-  { id: 'hero', label: 'Hero intro', description: 'Heading, body copy, and CTA.' },
-  { id: 'announcement', label: 'Announcement', description: 'Simple update with copy and divider.' },
-  { id: 'image-left-text-right', label: 'Image left / text right', description: 'Media-first split layout with copy and CTA.' },
-  { id: 'image-right-text-left', label: 'Image right / text left', description: 'Copy-first split layout with media on the right.' },
-  { id: 'three-up-features', label: 'Three-up features', description: 'Three aligned columns for feature highlights.' },
 ]
 
 const mjmlSnippetOptions = [
@@ -123,300 +94,19 @@ const previewViewportOptions: { id: PreviewViewport; label: string; width: numbe
   { id: 'mobile', label: 'Mobile', width: 390, description: 'Phone-sized viewport with stacked columns.' },
 ]
 
-function createId(prefix: string) {
-  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`
+function getPreviewSignature(draft: TemplateDraft) {
+  return JSON.stringify({
+    mjmlBody: draft.editorDocument ? '' : draft.mjmlBody,
+    editorDocument: draft.editorDocument,
+  })
 }
 
-function cloneEditorDocument(document: EditorDocument | null | undefined): EditorDocument | null {
-  return document ? JSON.parse(JSON.stringify(document)) as EditorDocument : null
-}
-
-function serializeEditorDocument(document: EditorDocument | null | undefined) {
-  return document ? JSON.stringify(document) : ''
-}
-
-function toOptionalNumber(value: string) {
-  const trimmed = value.trim()
-
-  if (trimmed.length === 0) {
-    return null
+function getPublishButtonLabel(hasUnsavedChanges: boolean, isPublishing: boolean) {
+  if (isPublishing) {
+    return hasUnsavedChanges ? 'Saving & publishing…' : 'Publishing…'
   }
 
-  const parsed = Number(trimmed)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
-function toBlockLabel(type: EditorBlockType) {
-  return builderBlockPalette.find((block) => block.type === type)?.label ?? type
-}
-
-function createDefaultBlock(type: EditorBlockType): EditorBlock {
-  switch (type) {
-    case 'Hero':
-      return {
-        id: createId('hero'),
-        type,
-        textContent: 'Fresh campaign headline',
-        textColor: '#1f2937',
-        alignment: 'Left',
-        fontSize: 24,
-      }
-    case 'Text':
-      return {
-        id: createId('text'),
-        type,
-        textContent: 'Add supporting copy for this campaign section.',
-        textColor: '#475569',
-        alignment: 'Left',
-        fontSize: 16,
-      }
-    case 'Image':
-      return {
-        id: createId('image'),
-        type,
-        imageUrl: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=1200&q=80',
-        altText: 'Campaign visual',
-        alignment: 'Center',
-      }
-    case 'Button':
-      return {
-        id: createId('button'),
-        type,
-        actionLabel: 'Shop now',
-        actionUrl: 'https://example.com',
-        backgroundColor: '#2563eb',
-        textColor: '#ffffff',
-        alignment: 'Left',
-      }
-    case 'Spacer':
-      return {
-        id: createId('spacer'),
-        type,
-        spacing: 24,
-      }
-    case 'Divider':
-      return {
-        id: createId('divider'),
-        type,
-        dividerColor: '#d1d5db',
-        dividerThickness: 1,
-      }
-  }
-}
-
-function createSection(columnCount = 1, blocksPerColumn?: EditorBlock[][]): EditorSection {
-  const safeColumnCount = Math.max(1, columnCount)
-  const widthPercentage = Math.floor(100 / safeColumnCount)
-
-  return {
-    id: createId('section'),
-    backgroundColor: '#ffffff',
-    padding: 24,
-    columns: Array.from({ length: safeColumnCount }, (_, index) => ({
-      id: createId('column'),
-      widthPercentage: index === safeColumnCount - 1
-        ? 100 - (widthPercentage * (safeColumnCount - 1))
-        : widthPercentage,
-      blocks: blocksPerColumn?.[index]?.length
-        ? blocksPerColumn[index]
-        : index === 0
-          ? [createDefaultBlock('Text')]
-          : [],
-    })),
-  }
-}
-
-function createFeatureColumn(title: string, body: string): EditorBlock[] {
-  return [
-    {
-      id: createId('hero'),
-      type: 'Hero',
-      textContent: title,
-      textColor: '#1f2937',
-      alignment: 'Center',
-      fontSize: 18,
-    },
-    {
-      id: createId('text'),
-      type: 'Text',
-      textContent: body,
-      textColor: '#475569',
-      alignment: 'Center',
-      fontSize: 14,
-    },
-  ]
-}
-
-function createImageTextColumns(imageFirst: boolean): EditorBlock[][] {
-  const imageColumn: EditorBlock[] = [
-    {
-      id: createId('image'),
-      type: 'Image',
-      imageUrl: 'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=1200&q=80',
-      altText: 'Featured product',
-      alignment: 'Center',
-    },
-  ]
-
-  const textColumn: EditorBlock[] = [
-    {
-      id: createId('hero'),
-      type: 'Hero',
-      textContent: imageFirst ? 'Image left, copy right' : 'Copy left, image right',
-      textColor: '#1f2937',
-      alignment: 'Left',
-      fontSize: 22,
-    },
-    {
-      id: createId('text'),
-      type: 'Text',
-      textContent: 'Use this split layout for product highlights, offers, or editorial modules.',
-      textColor: '#475569',
-      alignment: 'Left',
-      fontSize: 16,
-    },
-    {
-      id: createId('button'),
-      type: 'Button',
-      actionLabel: 'Learn more',
-      actionUrl: 'https://example.com',
-      backgroundColor: '#2563eb',
-      textColor: '#ffffff',
-      alignment: 'Left',
-    },
-  ]
-
-  return imageFirst ? [imageColumn, textColumn] : [textColumn, imageColumn]
-}
-
-function createStarterEditorDocument(headline = 'Fresh campaign headline', body = 'Add supporting copy for this campaign.', ctaLabel = 'Shop now'): EditorDocument {
-  return {
-    version: 1,
-    sections: [
-      createSection(1, [[
-        {
-          id: createId('hero'),
-          type: 'Hero',
-          textContent: headline,
-          textColor: '#1f2937',
-          alignment: 'Left',
-          fontSize: 24,
-        },
-        {
-          id: createId('text'),
-          type: 'Text',
-          textContent: body,
-          textColor: '#475569',
-          alignment: 'Left',
-          fontSize: 16,
-        },
-        {
-          id: createId('button'),
-          type: 'Button',
-          actionLabel: ctaLabel,
-          actionUrl: 'https://example.com',
-          backgroundColor: '#2563eb',
-          textColor: '#ffffff',
-          alignment: 'Left',
-        },
-      ]]),
-    ],
-  }
-}
-
-function createPresetSections(preset: BuilderPreset): EditorSection[] {
-  switch (preset) {
-    case 'hero':
-      return [createStarterEditorDocument().sections[0]]
-    case 'announcement':
-      return [
-        createSection(1, [[
-          {
-            id: createId('hero'),
-            type: 'Hero',
-            textContent: 'Big update for your subscribers',
-            textColor: '#0f172a',
-            alignment: 'Left',
-            fontSize: 22,
-          },
-          {
-            id: createId('text'),
-            type: 'Text',
-            textContent: 'Lead with the most important change, then invite readers to keep exploring.',
-            textColor: '#475569',
-            alignment: 'Left',
-            fontSize: 16,
-          },
-          createDefaultBlock('Divider'),
-        ]]),
-      ]
-    case 'image-left-text-right':
-      return [
-        createSection(2, createImageTextColumns(true)),
-      ]
-    case 'image-right-text-left':
-      return [
-        createSection(2, createImageTextColumns(false)),
-      ]
-    case 'three-up-features':
-      return [
-        createSection(3, [
-          createFeatureColumn('Free delivery', 'Highlight a logistics or customer promise.'),
-          createFeatureColumn('New arrivals', 'Spotlight fresh product or campaign themes.'),
-          createFeatureColumn('Member offer', 'Call out an incentive or exclusive benefit.'),
-        ]),
-      ]
-  }
-}
-
-function createStarterMjml(headline = 'Fresh campaign headline', body = 'Add supporting copy for this campaign.', ctaLabel = 'Shop now') {
-  return `<mjml>
-  <mj-body background-color="#f5f7fb">
-    <mj-section background-color="#ffffff" padding="24px">
-      <mj-column>
-        <mj-text font-size="24px" font-weight="700" color="#1f2937">${headline}</mj-text>
-        <mj-text font-size="16px" color="#4b5563">${body}</mj-text>
-        <mj-button background-color="#2563eb" color="#ffffff">${ctaLabel}</mj-button>
-      </mj-column>
-    </mj-section>
-  </mj-body>
-</mjml>`
-}
-
-function moveItem<T>(items: T[], fromIndex: number, toIndex: number) {
-  if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= items.length || toIndex >= items.length) {
-    return items
-  }
-
-  const nextItems = [...items]
-  const [movedItem] = nextItems.splice(fromIndex, 1)
-  nextItems.splice(toIndex, 0, movedItem)
-  return nextItems
-}
-
-  function getPreviewSignature(draft: TemplateDraft) {
-    return JSON.stringify({
-      mjmlBody: draft.editorDocument ? '' : draft.mjmlBody,
-      editorDocument: draft.editorDocument,
-    })
-  }
-
-  function getPublishButtonLabel(hasUnsavedChanges: boolean, isPublishing: boolean) {
-    if (isPublishing) {
-      return hasUnsavedChanges ? 'Saving & publishing…' : 'Publishing…'
-    }
-
-    return hasUnsavedChanges ? 'Save & publish' : 'Publish'
-  }
-
-function toDraft(template: TemplateDto): TemplateDraft {
-  return {
-    name: template.name,
-    subject: template.subject,
-    status: template.status,
-    mjmlBody: template.mjmlBody,
-    editorDocument: cloneEditorDocument(template.editorDocument ?? null),
-  }
+  return hasUnsavedChanges ? 'Save & publish' : 'Publish'
 }
 
 function parseAppRoute(pathname: string): AppRoute {
@@ -452,6 +142,7 @@ function App() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null)
   const selectedTemplateIdRef = useRef<string | null>(null)
   const mjmlEditorRef = useRef<HTMLTextAreaElement | null>(null)
+  const previewRenderRequestIdRef = useRef(0)
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateDto | null>(null)
   const [draft, setDraft] = useState<TemplateDraft | null>(null)
   const [search, setSearch] = useState('')
@@ -494,18 +185,39 @@ function App() {
   const seedOverrideCommand = `${seedCommand} -- --Seed:TemplatesPerTenant=12`
   const isPreviewStale = draft !== null && previewMjmlSnapshot !== getPreviewSignature(draft)
   const isEditorRoute = route.kind === 'editor'
-  const selectedSection = useMemo(
-    () => draft?.editorDocument?.sections.find((section) => section.id === selectedSectionId) ?? null,
-    [draft?.editorDocument, selectedSectionId]
-  )
-  const selectedColumn = useMemo(
-    () => selectedSection?.columns.find((column) => column.id === selectedColumnId) ?? null,
-    [selectedColumnId, selectedSection]
-  )
-  const selectedBlock = useMemo(
-    () => (selectedColumn ?? selectedSection?.columns[0])?.blocks.find((block) => block.id === selectedBlockId) ?? null,
-    [selectedBlockId, selectedColumn, selectedSection]
-  )
+  const selection = useMemo(() => {
+    const sections = draft?.editorDocument?.sections ?? []
+
+    if (sections.length === 0) {
+      return {
+        section: null,
+        column: null,
+        block: null,
+        sectionId: null,
+        columnId: null,
+        blockId: null,
+      }
+    }
+
+    const section = sections.find((candidate) => candidate.id === selectedSectionId) ?? sections[0]
+    const column = section.columns.find((candidate) => candidate.id === selectedColumnId) ?? section.columns[0] ?? null
+    const block = column?.blocks.find((candidate) => candidate.id === selectedBlockId) ?? column?.blocks[0] ?? null
+
+    return {
+      section,
+      column,
+      block,
+      sectionId: section.id,
+      columnId: column?.id ?? null,
+      blockId: block?.id ?? null,
+    }
+  }, [draft?.editorDocument, selectedBlockId, selectedColumnId, selectedSectionId])
+  const selectedSection = selection.section
+  const selectedColumn = selection.column
+  const selectedBlock = selection.block
+  const currentSelectedSectionId = selection.sectionId
+  const currentSelectedColumnId = selection.columnId
+  const currentSelectedBlockId = selection.blockId
 
   const filteredTemplates = useMemo(() => {
     const query = search.trim().toLowerCase()
@@ -657,6 +369,7 @@ function App() {
     let isActive = true
     const previewSignature = getPreviewSignature(draft)
     const timer = window.setTimeout(async () => {
+      const requestId = ++previewRenderRequestIdRef.current
       setIsRenderingPreview(true)
 
       try {
@@ -681,7 +394,7 @@ function App() {
         resetPreview()
         setErrorMessage(getErrorMessage(error, 'Unable to render MJML preview.'))
       } finally {
-        if (isActive) {
+        if (requestId === previewRenderRequestIdRef.current) {
           setIsRenderingPreview(false)
         }
       }
@@ -692,37 +405,6 @@ function App() {
       window.clearTimeout(timer)
     }
   }, [draft, handleUnauthorized, isAutoPreviewEnabled, isPreviewStale, isRenderingPreview, resetPreview, tenantId])
-
-  useEffect(() => {
-    const sections = draft?.editorDocument?.sections ?? []
-
-    if (sections.length === 0) {
-      setSelectedSectionId(null)
-      setSelectedColumnId(null)
-      setSelectedBlockId(null)
-      return
-    }
-
-    const activeSection = sections.find((section) => section.id === selectedSectionId) ?? sections[0]
-    const activeColumn = activeSection.columns.find((column) => column.id === selectedColumnId) ?? activeSection.columns[0]
-    const activeBlock = activeColumn?.blocks.find((block) => block.id === selectedBlockId) ?? activeColumn?.blocks[0] ?? null
-
-    if (activeSection.id !== selectedSectionId) {
-      setSelectedSectionId(activeSection.id)
-    }
-
-    if (activeColumn?.id !== selectedColumnId) {
-      setSelectedColumnId(activeColumn?.id ?? null)
-    }
-
-    if (activeBlock?.id !== selectedBlockId) {
-      setSelectedBlockId(activeBlock?.id ?? null)
-    }
-
-    if (!activeBlock && selectedBlockId) {
-      setSelectedBlockId(null)
-    }
-  }, [draft?.editorDocument, selectedBlockId, selectedColumnId, selectedSectionId])
 
   useEffect(() => {
     let isActive = true
@@ -1106,11 +788,11 @@ function App() {
       return
     }
 
-    const targetSection = draft.editorDocument.sections.find((section) => section.id === selectedSectionId)
+    const targetSection = draft.editorDocument.sections.find((section) => section.id === currentSelectedSectionId)
       ?? draft.editorDocument.sections[0]
 
     const targetSectionId = targetSection?.id
-    const targetColumnId = targetSection?.columns.find((column) => column.id === selectedColumnId)?.id
+    const targetColumnId = targetSection?.columns.find((column) => column.id === currentSelectedColumnId)?.id
       ?? targetSection?.columns[0]?.id
 
     if (!targetSectionId || !targetColumnId) {
@@ -1140,6 +822,17 @@ function App() {
     setSelectedBlockId(nextBlock.id)
   }
 
+  function handlePaletteBlockDragStart(type: EditorBlockType) {
+    setDraggedBlock({
+      source: 'palette',
+      blockType: type,
+    })
+    setDraggedSectionId(null)
+    setSectionDropTargetId(null)
+    setColumnDropTargetId(null)
+    setBlockDropTargetId(null)
+  }
+
   function handleSelectSection(sectionId: string) {
     setSelectedSectionId(sectionId)
     setSelectedColumnId(null)
@@ -1159,29 +852,49 @@ function App() {
   }
 
   function handleUpdateSection(changes: Partial<EditorSection>) {
-    if (!selectedSectionId) {
+    if (!currentSelectedSectionId) {
       return
     }
 
     updateEditorDocument((current) => ({
       ...current,
       sections: current.sections.map((section) => (
-        section.id === selectedSectionId
+        section.id === currentSelectedSectionId
           ? { ...section, ...changes }
           : section
       )),
     }))
   }
 
+  function handleUpdateSelectedColumn(changes: Partial<EditorColumn>) {
+    if (!currentSelectedSectionId || !currentSelectedColumnId) {
+      return
+    }
+
+    updateEditorDocument((current) => ({
+      ...current,
+      sections: current.sections.map((section) => (
+        section.id !== currentSelectedSectionId
+          ? section
+          : {
+              ...section,
+              columns: section.columns.map((column) => (
+                column.id === currentSelectedColumnId ? { ...column, ...changes } : column
+              )),
+            }
+      )),
+    }))
+  }
+
   function handleUpdateSelectedColumnWidth(nextWidth: number | null) {
-    if (!selectedSectionId || !selectedColumnId || nextWidth === null) {
+    if (!currentSelectedSectionId || !currentSelectedColumnId || nextWidth === null) {
       return
     }
 
     updateEditorDocument((current) => ({
       ...current,
       sections: current.sections.map((section) => {
-        if (section.id !== selectedSectionId) {
+        if (section.id !== currentSelectedSectionId) {
           return section
         }
 
@@ -1192,7 +905,7 @@ function App() {
           return {
             ...section,
             columns: section.columns.map((column) => (
-              column.id === selectedColumnId
+              column.id === currentSelectedColumnId
                 ? { ...column, widthPercentage: 100 }
                 : column
             )),
@@ -1207,7 +920,7 @@ function App() {
         return {
           ...section,
           columns: section.columns.map((column) => {
-            if (column.id === selectedColumnId) {
+            if (column.id === currentSelectedColumnId) {
               return { ...column, widthPercentage: boundedWidth }
             }
 
@@ -1221,14 +934,14 @@ function App() {
   }
 
   function handleUpdateSelectedBlock(changes: Partial<EditorBlock>) {
-    if (!selectedSectionId || !selectedColumnId || !selectedBlockId) {
+    if (!currentSelectedSectionId || !currentSelectedColumnId || !currentSelectedBlockId) {
       return
     }
 
     updateEditorDocument((current) => ({
       ...current,
       sections: current.sections.map((section) => {
-        if (section.id !== selectedSectionId) {
+        if (section.id !== currentSelectedSectionId) {
           return section
         }
 
@@ -1236,15 +949,151 @@ function App() {
           ...section,
           columns: section.columns.map((column) => ({
             ...column,
-            blocks: column.id !== selectedColumnId
+            blocks: column.id !== currentSelectedColumnId
               ? column.blocks
               : column.blocks.map((block) => (
-                  block.id === selectedBlockId ? { ...block, ...changes } : block
+                  block.id === currentSelectedBlockId ? { ...block, ...changes } : block
                 )),
           })),
         }
       }),
     }))
+  }
+
+  function handleUpdateSelectedBlockItems(updater: (items: EditorBlockItem[]) => EditorBlockItem[]) {
+    if (!selectedBlock) {
+      return
+    }
+
+    const currentItems = (selectedBlock.items ?? []).map((item) => ({ ...item }))
+    handleUpdateSelectedBlock({ items: updater(currentItems) })
+  }
+
+  function handleAddSelectedBlockItem() {
+    if (!selectedBlock || (selectedBlock.type !== 'LinkList' && selectedBlock.type !== 'SocialLinks')) {
+      return
+    }
+
+    const nextItem = selectedBlock.type === 'SocialLinks'
+      ? createDefaultBlockItem('social', 'New network', 'https://example.com/social')
+      : createDefaultBlockItem('link', 'New link', 'https://example.com/link')
+
+    handleUpdateSelectedBlockItems((items) => [...items, nextItem])
+  }
+
+  function handleUpdateSelectedBlockItem(itemId: string, changes: Partial<EditorBlockItem>) {
+    handleUpdateSelectedBlockItems((items) =>
+      items.map((item) => (item.id === itemId ? { ...item, ...changes } : item))
+    )
+  }
+
+  function handleRemoveSelectedBlockItem(itemId: string) {
+    handleUpdateSelectedBlockItems((items) =>
+      items.length <= 1 ? items : items.filter((item) => item.id !== itemId)
+    )
+  }
+
+  function handleDuplicateSection(sectionId: string) {
+    const sectionIndex = draft?.editorDocument?.sections.findIndex((section) => section.id === sectionId) ?? -1
+
+    if (!draft?.editorDocument || sectionIndex < 0) {
+      return
+    }
+
+    const nextDuplicatedSection = duplicateSectionWithIds(draft.editorDocument.sections[sectionIndex])
+
+    updateEditorDocument((current) => ({
+      ...current,
+      sections: [
+        ...current.sections.slice(0, sectionIndex + 1),
+        nextDuplicatedSection,
+        ...current.sections.slice(sectionIndex + 1),
+      ],
+    }))
+
+    setSelectedSectionId(nextDuplicatedSection.id)
+    setSelectedColumnId(nextDuplicatedSection.columns[0]?.id ?? null)
+    setSelectedBlockId(nextDuplicatedSection.columns[0]?.blocks[0]?.id ?? null)
+  }
+
+  function handleDeleteSection(sectionId: string) {
+    updateEditorDocument((current) => ({
+      ...current,
+      sections: current.sections.filter((section) => section.id !== sectionId),
+    }))
+
+    if (selectedSectionId === sectionId) {
+      setSelectedSectionId(null)
+      setSelectedColumnId(null)
+      setSelectedBlockId(null)
+    }
+  }
+
+  function handleDuplicateBlock(sectionId: string, columnId: string, blockId: string) {
+    const section = draft?.editorDocument?.sections.find((candidate) => candidate.id === sectionId)
+    const column = section?.columns.find((candidate) => candidate.id === columnId)
+    const sourceIndex = column?.blocks.findIndex((block) => block.id === blockId) ?? -1
+
+    if (!column || sourceIndex < 0) {
+      return
+    }
+
+    const nextDuplicatedBlock = duplicateBlockWithIds(column.blocks[sourceIndex])
+
+    updateEditorDocument((current) => ({
+      ...current,
+      sections: current.sections.map((section) => {
+        if (section.id !== sectionId) {
+          return section
+        }
+
+        return {
+          ...section,
+          columns: section.columns.map((column) => {
+            if (column.id !== columnId) {
+              return column
+            }
+
+            return {
+              ...column,
+              blocks: [
+                ...column.blocks.slice(0, sourceIndex + 1),
+                nextDuplicatedBlock,
+                ...column.blocks.slice(sourceIndex + 1),
+              ],
+            }
+          }),
+        }
+      }),
+    }))
+
+    setSelectedSectionId(sectionId)
+    setSelectedColumnId(columnId)
+    setSelectedBlockId(nextDuplicatedBlock.id)
+  }
+
+  function handleDeleteBlock(sectionId: string, columnId: string, blockId: string) {
+    updateEditorDocument((current) => ({
+      ...current,
+      sections: current.sections.map((section) => {
+        if (section.id !== sectionId) {
+          return section
+        }
+
+        return {
+          ...section,
+          columns: section.columns.map((column) => (
+            column.id === columnId
+              ? { ...column, blocks: column.blocks.filter((block) => block.id !== blockId) }
+              : column
+          )),
+        }
+      }),
+    }))
+
+    if (selectedBlockId === blockId) {
+      setSelectedBlockId(null)
+    }
   }
 
   function clearDragState() {
@@ -1283,86 +1132,50 @@ function App() {
   }
 
   function handleBlockDragStart(sectionId: string, columnId: string, blockId: string) {
-    setDraggedBlock({ sectionId, columnId, blockId })
+    setDraggedBlock({ source: 'canvas', sectionId, columnId, blockId })
     setDraggedSectionId(null)
     setSectionDropTargetId(null)
     setColumnDropTargetId(null)
     setBlockDropTargetId(null)
   }
 
-  function handleBlockDropOnBlock(targetSectionId: string, targetColumnId: string, targetBlockId: string) {
-    if (!draggedBlock || draggedBlock.blockId === targetBlockId) {
-      clearDragState()
-      return
-    }
-
-    updateEditorDocument((current) => {
-      let movedBlock: EditorBlock | null = null
-
-      const sectionsWithoutDraggedBlock = current.sections.map((section) => ({
-        ...section,
-        columns: section.columns.map((column) => {
-          if (section.id !== draggedBlock.sectionId || column.id !== draggedBlock.columnId) {
-            return column
-          }
-
-          const nextBlocks = column.blocks.filter((block) => {
-            if (block.id === draggedBlock.blockId) {
-              movedBlock = block
-              return false
-            }
-
-            return true
-          })
-
-          return {
-            ...column,
-            blocks: nextBlocks,
-          }
-        }),
-      }))
-
-      if (!movedBlock) {
-        return current
-      }
-
-      const blockToMove = movedBlock
-
-      return {
-        ...current,
-        sections: sectionsWithoutDraggedBlock.map((section) => ({
-          ...section,
-          columns: section.columns.map((column) => {
-            if (section.id !== targetSectionId || column.id !== targetColumnId) {
-              return column
-            }
-
-            const insertIndex = column.blocks.findIndex((block) => block.id === targetBlockId)
-            const nextBlocks = [...column.blocks]
-            nextBlocks.splice(insertIndex < 0 ? nextBlocks.length : insertIndex, 0, blockToMove)
-
-            return {
-              ...column,
-              blocks: nextBlocks,
-            }
-          }),
-        })),
-      }
-    })
-
-    setSelectedSectionId(targetSectionId)
-    setSelectedColumnId(targetColumnId)
-    setSelectedBlockId(draggedBlock.blockId)
-    clearDragState()
-  }
-
-  function handleBlockDropOnColumn(targetSectionId: string, targetColumnId: string) {
+  function handleInsertDraggedBlock(targetSectionId: string, targetColumnId: string, targetBlockId?: string) {
     if (!draggedBlock) {
       clearDragState()
       return
     }
 
+    if (isCanvasDraggedBlock(draggedBlock) && draggedBlock.blockId === targetBlockId) {
+      clearDragState()
+      return
+    }
+
+    let insertedBlockId: string | null = isCanvasDraggedBlock(draggedBlock) ? draggedBlock.blockId : null
+
     updateEditorDocument((current) => {
+      if (isPaletteDraggedBlock(draggedBlock)) {
+        const nextBlock = createDefaultBlock(draggedBlock.blockType)
+        insertedBlockId = nextBlock.id
+
+        return {
+          ...current,
+          sections: current.sections.map((section) => {
+            if (section.id !== targetSectionId) {
+              return section
+            }
+
+            return {
+              ...section,
+              columns: section.columns.map((column) => (
+                column.id === targetColumnId
+                  ? { ...column, blocks: insertBlock(column.blocks, nextBlock, targetBlockId) }
+                  : column
+              )),
+            }
+          }),
+        }
+      }
+
       let movedBlock: EditorBlock | null = null
 
       const sectionsWithoutDraggedBlock = current.sections.map((section) => ({
@@ -1405,17 +1218,30 @@ function App() {
 
             return {
               ...column,
-              blocks: [...column.blocks, blockToMove],
+              blocks: insertBlock(column.blocks, blockToMove, targetBlockId),
             }
           }),
         })),
       }
     })
 
+    if (!insertedBlockId) {
+      clearDragState()
+      return
+    }
+
     setSelectedSectionId(targetSectionId)
     setSelectedColumnId(targetColumnId)
-    setSelectedBlockId(draggedBlock.blockId)
+    setSelectedBlockId(insertedBlockId)
     clearDragState()
+  }
+
+  function handleBlockDropOnBlock(targetSectionId: string, targetColumnId: string, targetBlockId: string) {
+    handleInsertDraggedBlock(targetSectionId, targetColumnId, targetBlockId)
+  }
+
+  function handleBlockDropOnColumn(targetSectionId: string, targetColumnId: string) {
+    handleInsertDraggedBlock(targetSectionId, targetColumnId)
   }
 
   async function handleLogin() {
@@ -1446,6 +1272,7 @@ function App() {
       return
     }
 
+    const requestId = ++previewRenderRequestIdRef.current
     setIsRenderingPreview(true)
 
     try {
@@ -1466,7 +1293,9 @@ function App() {
       resetPreview()
       setErrorMessage(getErrorMessage(error, 'Unable to render MJML preview.'))
     } finally {
-      setIsRenderingPreview(false)
+      if (requestId === previewRenderRequestIdRef.current) {
+        setIsRenderingPreview(false)
+      }
     }
   }
 
@@ -1810,31 +1639,35 @@ function App() {
               <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)_380px]">
                 <BuilderSidebar
                   draft={draft}
-                  selectedTemplate={selectedTemplate}
                   activeBuilderTab={activeBuilderTab}
                   setActiveBuilderTab={setActiveBuilderTab}
                   selectedSection={selectedSection}
                   selectedColumn={selectedColumn}
                   selectedBlock={selectedBlock}
-                  selectedSectionId={selectedSectionId}
-                  selectedColumnId={selectedColumnId}
-                  updateDraft={updateDraft}
+                  selectedSectionId={currentSelectedSectionId}
+                  selectedColumnId={currentSelectedColumnId}
                   handleAddBlock={handleAddBlock}
+                  handlePaletteBlockDragStart={handlePaletteBlockDragStart}
                   handleAddSection={handleAddSection}
                   handleAddPresetSection={handleAddPresetSection}
                   handleUpdateSection={handleUpdateSection}
+                  handleUpdateSelectedColumn={handleUpdateSelectedColumn}
                   handleUpdateSelectedColumnWidth={handleUpdateSelectedColumnWidth}
                   handleUpdateSelectedBlock={handleUpdateSelectedBlock}
+                  handleAddSelectedBlockItem={handleAddSelectedBlockItem}
+                  handleUpdateSelectedBlockItem={handleUpdateSelectedBlockItem}
+                  handleRemoveSelectedBlockItem={handleRemoveSelectedBlockItem}
                   handleSelectSection={handleSelectSection}
                   handleSelectColumn={handleSelectColumn}
                   handleStartBuilder={handleStartBuilder}
+                  clearDragState={clearDragState}
                 />
 
                 <BuilderCanvas
                   draft={draft}
-                  selectedSectionId={selectedSectionId}
-                  selectedColumnId={selectedColumnId}
-                  selectedBlockId={selectedBlockId}
+                  selectedSectionId={currentSelectedSectionId}
+                  selectedColumnId={currentSelectedColumnId}
+                  selectedBlockId={currentSelectedBlockId}
                   draggedSectionId={draggedSectionId}
                   draggedBlock={draggedBlock}
                   sectionDropTargetId={sectionDropTargetId}
@@ -1854,6 +1687,10 @@ function App() {
                   clearDragState={clearDragState}
                   handleStartBuilder={handleStartBuilder}
                   handleAddSection={handleAddSection}
+                  handleDuplicateSection={handleDuplicateSection}
+                  handleDeleteSection={handleDeleteSection}
+                  handleDuplicateBlock={handleDuplicateBlock}
+                  handleDeleteBlock={handleDeleteBlock}
                 />
 
                 <aside className="space-y-6">
@@ -3088,909 +2925,6 @@ function PreviewModal({
           </div>
         </div>
       </div>
-    </div>
-  )
-}
-
-type BuilderSidebarProps = {
-  draft: TemplateDraft
-  selectedTemplate: TemplateDto
-  activeBuilderTab: BuilderSidebarTab
-  setActiveBuilderTab: (tab: BuilderSidebarTab) => void
-  selectedSection: EditorSection | null
-  selectedColumn: EditorColumn | null
-  selectedBlock: EditorBlock | null
-  selectedSectionId: string | null
-  selectedColumnId: string | null
-  updateDraft: (field: keyof TemplateDraft, value: string) => void
-  handleAddBlock: (type: EditorBlockType) => void
-  handleAddSection: (columnCount: number) => void
-  handleAddPresetSection: (preset: BuilderPreset) => void
-  handleUpdateSection: (changes: Partial<EditorSection>) => void
-  handleUpdateSelectedColumnWidth: (width: number | null) => void
-  handleUpdateSelectedBlock: (changes: Partial<EditorBlock>) => void
-  handleSelectSection: (sectionId: string) => void
-  handleSelectColumn: (sectionId: string, columnId: string) => void
-  handleStartBuilder: (preset?: BuilderPreset) => void
-}
-
-function BuilderSidebar({
-  draft,
-  selectedTemplate,
-  activeBuilderTab,
-  setActiveBuilderTab,
-  selectedSection,
-  selectedColumn,
-  selectedBlock,
-  selectedSectionId,
-  selectedColumnId,
-  updateDraft,
-  handleAddBlock,
-  handleAddSection,
-  handleAddPresetSection,
-  handleUpdateSection,
-  handleUpdateSelectedColumnWidth,
-  handleUpdateSelectedBlock,
-  handleSelectSection,
-  handleSelectColumn,
-  handleStartBuilder,
-}: BuilderSidebarProps) {
-  const hasBuilderDocument = draft.editorDocument !== null
-
-  return (
-    <aside className="space-y-6">
-      <div className="rounded-[28px] border border-white/10 bg-slate-900/50 p-5 shadow-2xl shadow-black/20">
-        <div className="flex flex-wrap items-center gap-3">
-          <StatusPill status={selectedTemplate.status} />
-          <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-semibold text-slate-300">
-            Revision {selectedTemplate.currentRevisionNumber}
-          </span>
-        </div>
-
-        <div className="mt-5 space-y-4">
-          <label className="block">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-              Template name
-            </span>
-            <input
-              type="text"
-              value={draft.name}
-              onChange={(event) => updateDraft('name', event.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-              Subject line
-            </span>
-            <input
-              type="text"
-              value={draft.subject}
-              onChange={(event) => updateDraft('subject', event.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-            />
-          </label>
-
-          <label className="block">
-            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-              Status
-            </span>
-            <select
-              value={draft.status === 'Published' ? 'Draft' : draft.status}
-              onChange={(event) => updateDraft('status', event.target.value as TemplateStatus)}
-              className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-            >
-              <option value="Draft">Draft</option>
-              <option value="Archived">Archived</option>
-            </select>
-          </label>
-        </div>
-      </div>
-
-      <div className="rounded-[28px] border border-white/10 bg-slate-900/50 p-5 shadow-2xl shadow-black/20">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-          Builder tools
-        </p>
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          {builderTabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveBuilderTab(tab.id)}
-              className={`rounded-2xl border px-3 py-2 text-sm font-medium transition ${
-                activeBuilderTab === tab.id
-                  ? 'border-sky-400/50 bg-sky-500/10 text-sky-100'
-                  : 'border-white/10 bg-slate-950/60 text-slate-300 hover:border-white/20 hover:bg-slate-900'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-5">
-          {activeBuilderTab === 'blocks' && (
-            <div className="space-y-4">
-              <div className="grid gap-2">
-                {builderBlockPalette.map((block) => (
-                  <button
-                    key={block.type}
-                    type="button"
-                    onClick={() => handleAddBlock(block.type)}
-                    disabled={!hasBuilderDocument}
-                    className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-left transition hover:border-white/20 hover:bg-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <span className="block text-sm font-semibold text-white">{block.label}</span>
-                    <span className="mt-1 block text-xs text-slate-400">{block.description}</span>
-                  </button>
-                ))}
-              </div>
-
-              {!hasBuilderDocument ? (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-5 text-sm text-slate-400">
-                  Start the builder from the canvas or presets tab before adding blocks.
-                </div>
-              ) : !selectedBlock ? (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-5 text-sm text-slate-400">
-                  {selectedColumn
-                    ? 'Add a block to the selected column, or select a block in the canvas to edit its content.'
-                    : 'Select a column or block in the canvas to start adding content.'}
-                </div>
-              ) : (
-                <div className="rounded-3xl border border-white/10 bg-slate-950/50 p-4">
-                  <p className="text-sm font-semibold text-white">{toBlockLabel(selectedBlock.type)}</p>
-                  <p className="mt-1 text-xs text-slate-500">{selectedBlock.id}</p>
-
-                  <div className="mt-4 space-y-3">
-                    {(selectedBlock.type === 'Hero' || selectedBlock.type === 'Text') && (
-                      <label className="block">
-                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                          Copy
-                        </span>
-                        <textarea
-                          value={selectedBlock.textContent ?? ''}
-                          onChange={(event) => handleUpdateSelectedBlock({ textContent: event.target.value })}
-                          className="min-h-[140px] w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                        />
-                      </label>
-                    )}
-
-                    {selectedBlock.type === 'Image' && (
-                      <>
-                        <label className="block">
-                          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                            Image URL
-                          </span>
-                          <input
-                            type="text"
-                            value={selectedBlock.imageUrl ?? ''}
-                            onChange={(event) => handleUpdateSelectedBlock({ imageUrl: event.target.value })}
-                            className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                          />
-                        </label>
-                        <label className="block">
-                          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                            Alt text
-                          </span>
-                          <input
-                            type="text"
-                            value={selectedBlock.altText ?? ''}
-                            onChange={(event) => handleUpdateSelectedBlock({ altText: event.target.value })}
-                            className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                          />
-                        </label>
-                      </>
-                    )}
-
-                    {selectedBlock.type === 'Button' && (
-                      <>
-                        <label className="block">
-                          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                            Label
-                          </span>
-                          <input
-                            type="text"
-                            value={selectedBlock.actionLabel ?? ''}
-                            onChange={(event) => handleUpdateSelectedBlock({ actionLabel: event.target.value })}
-                            className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                          />
-                        </label>
-                        <label className="block">
-                          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                            URL
-                          </span>
-                          <input
-                            type="text"
-                            value={selectedBlock.actionUrl ?? ''}
-                            onChange={(event) => handleUpdateSelectedBlock({ actionUrl: event.target.value })}
-                            className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                          />
-                        </label>
-                      </>
-                    )}
-
-                    {selectedBlock.type === 'Spacer' && (
-                      <label className="block">
-                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                          Height
-                        </span>
-                        <input
-                          type="number"
-                          min={1}
-                          value={selectedBlock.spacing ?? ''}
-                          onChange={(event) => handleUpdateSelectedBlock({ spacing: toOptionalNumber(event.target.value) })}
-                          className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                        />
-                      </label>
-                    )}
-
-                    {selectedBlock.type === 'Divider' && (
-                      <label className="block">
-                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                          Thickness
-                        </span>
-                        <input
-                          type="number"
-                          min={1}
-                          value={selectedBlock.dividerThickness ?? ''}
-                          onChange={(event) => handleUpdateSelectedBlock({ dividerThickness: toOptionalNumber(event.target.value) })}
-                          className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                        />
-                      </label>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeBuilderTab === 'sections' && (
-            <div className="space-y-4">
-              <div className="grid gap-2">
-                {builderSectionOptions.map((option) => (
-                  <button
-                    key={option.label}
-                    type="button"
-                    onClick={() => handleAddSection(option.columns)}
-                    className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-left transition hover:border-white/20 hover:bg-slate-900"
-                  >
-                    <span className="block text-sm font-semibold text-white">{option.label}</span>
-                    <span className="mt-1 block text-xs text-slate-400">{option.description}</span>
-                  </button>
-                ))}
-              </div>
-
-              {draft.editorDocument ? (
-                <div className="space-y-2">
-                  {draft.editorDocument.sections.map((section, index) => (
-                    <button
-                      key={section.id}
-                      type="button"
-                      onClick={() => handleSelectSection(section.id)}
-                      className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
-                        selectedSectionId === section.id
-                          ? 'border-sky-400/50 bg-sky-500/10'
-                          : 'border-white/10 bg-slate-950/60 hover:border-white/20 hover:bg-slate-900'
-                      }`}
-                    >
-                      <span className="block text-sm font-semibold text-white">Section {index + 1}</span>
-                      <span className="mt-1 block text-xs text-slate-400">
-                        {section.columns.length} column{section.columns.length === 1 ? '' : 's'}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-5 text-sm text-slate-400">
-                  Add a section layout to start the canvas.
-                </div>
-              )}
-
-              {selectedSection && (
-                <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">Columns</p>
-                  {selectedSection.columns.map((column, index) => (
-                    <button
-                      key={column.id}
-                      type="button"
-                      onClick={() => handleSelectColumn(selectedSection.id, column.id)}
-                      className={`w-full rounded-2xl border px-4 py-3 text-left transition ${
-                        selectedColumnId === column.id
-                          ? 'border-sky-400/50 bg-sky-500/10'
-                          : 'border-white/10 bg-slate-950/60 hover:border-white/20 hover:bg-slate-900'
-                      }`}
-                    >
-                      <span className="block text-sm font-semibold text-white">Column {index + 1}</span>
-                      <span className="mt-1 block text-xs text-slate-400">
-                        {column.widthPercentage}% width · {column.blocks.length} block{column.blocks.length === 1 ? '' : 's'}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {activeBuilderTab === 'presets' && (
-            <div className="space-y-3">
-              {builderPresetOptions.map((preset) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  onClick={() => handleAddPresetSection(preset.id)}
-                  className="w-full rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-left transition hover:border-white/20 hover:bg-slate-900"
-                >
-                  <span className="block text-sm font-semibold text-white">{preset.label}</span>
-                  <span className="mt-1 block text-xs text-slate-400">{preset.description}</span>
-                </button>
-              ))}
-
-              {!hasBuilderDocument && (
-                <button
-                  type="button"
-                  onClick={() => handleStartBuilder('hero')}
-                  className="w-full rounded-2xl border border-sky-400/30 bg-sky-500/10 px-4 py-3 text-sm font-medium text-sky-100 transition hover:border-sky-300/50 hover:bg-sky-500/15"
-                >
-                  Start canvas with hero preset
-                </button>
-              )}
-            </div>
-          )}
-
-          {activeBuilderTab === 'styles' && (
-            <div className="space-y-4">
-              {!selectedSection && !selectedColumn && !selectedBlock ? (
-                <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-5 text-sm text-slate-400">
-                  Select a section, column, or block in the canvas to edit its available styles.
-                </div>
-              ) : (
-                <>
-                  {selectedSection && (
-                    <div className="rounded-3xl border border-white/10 bg-slate-950/50 p-4">
-                      <p className="text-sm font-semibold text-white">Section styles</p>
-                      <div className="mt-4 space-y-3">
-                        <label className="block">
-                          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                            Background
-                          </span>
-                          <input
-                            type="text"
-                            value={selectedSection.backgroundColor ?? ''}
-                            onChange={(event) => handleUpdateSection({ backgroundColor: event.target.value })}
-                            className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                          />
-                        </label>
-                        <label className="block">
-                          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                            Padding
-                          </span>
-                          <input
-                            type="number"
-                            min={1}
-                            value={selectedSection.padding ?? ''}
-                            onChange={(event) => handleUpdateSection({ padding: toOptionalNumber(event.target.value) })}
-                            className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                          />
-                        </label>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedColumn && (
-                    <div className="rounded-3xl border border-white/10 bg-slate-950/50 p-4">
-                      <p className="text-sm font-semibold text-white">Column styles</p>
-                      <div className="mt-4 space-y-3">
-                        <label className="block">
-                          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                            Width percentage
-                          </span>
-                          <input
-                            type="number"
-                            min={1}
-                            max={100}
-                            value={selectedColumn.widthPercentage}
-                            onChange={(event) => handleUpdateSelectedColumnWidth(toOptionalNumber(event.target.value))}
-                            className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                          />
-                        </label>
-                        <p className="text-xs text-slate-400">
-                          Updating one column redistributes the remaining width across the other columns in this section.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedBlock && (
-                    <div className="rounded-3xl border border-white/10 bg-slate-950/50 p-4">
-                      <p className="text-sm font-semibold text-white">{toBlockLabel(selectedBlock.type)} styles</p>
-                      <div className="mt-4 space-y-3">
-                        {!['Spacer', 'Divider'].includes(selectedBlock.type) && (
-                          <label className="block">
-                            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                              Alignment
-                            </span>
-                            <select
-                              value={selectedBlock.alignment ?? 'Left'}
-                              onChange={(event) => handleUpdateSelectedBlock({ alignment: event.target.value as EditorAlignment })}
-                              className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                            >
-                              <option value="Left">Left</option>
-                              <option value="Center">Center</option>
-                              <option value="Right">Right</option>
-                            </select>
-                          </label>
-                        )}
-
-                        {selectedBlock.type === 'Image' && (
-                          <label className="block">
-                            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                              Alignment
-                            </span>
-                            <select
-                              value={selectedBlock.alignment ?? 'Center'}
-                              onChange={(event) => handleUpdateSelectedBlock({ alignment: event.target.value as EditorAlignment })}
-                              className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                            >
-                              <option value="Left">Left</option>
-                              <option value="Center">Center</option>
-                              <option value="Right">Right</option>
-                            </select>
-                          </label>
-                        )}
-
-                        {(selectedBlock.type === 'Hero' || selectedBlock.type === 'Text') && (
-                          <>
-                            <label className="block">
-                              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                                Text color
-                              </span>
-                              <input
-                                type="text"
-                                value={selectedBlock.textColor ?? ''}
-                                onChange={(event) => handleUpdateSelectedBlock({ textColor: event.target.value })}
-                                className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                              />
-                            </label>
-                            <label className="block">
-                              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                                Font size
-                              </span>
-                              <input
-                                type="number"
-                                min={1}
-                                value={selectedBlock.fontSize ?? ''}
-                                onChange={(event) => handleUpdateSelectedBlock({ fontSize: toOptionalNumber(event.target.value) })}
-                                className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                              />
-                            </label>
-                          </>
-                        )}
-
-                        {selectedBlock.type === 'Spacer' && (
-                          <label className="block">
-                            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                              Height
-                            </span>
-                            <input
-                              type="number"
-                              min={1}
-                              value={selectedBlock.spacing ?? ''}
-                              onChange={(event) => handleUpdateSelectedBlock({ spacing: toOptionalNumber(event.target.value) })}
-                              className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                            />
-                          </label>
-                        )}
-
-                        {selectedBlock.type === 'Button' && (
-                          <>
-                            <label className="block">
-                              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                                Button background
-                              </span>
-                              <input
-                                type="text"
-                                value={selectedBlock.backgroundColor ?? ''}
-                                onChange={(event) => handleUpdateSelectedBlock({ backgroundColor: event.target.value })}
-                                className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                              />
-                            </label>
-                            <label className="block">
-                              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                                Text color
-                              </span>
-                              <input
-                                type="text"
-                                value={selectedBlock.textColor ?? ''}
-                                onChange={(event) => handleUpdateSelectedBlock({ textColor: event.target.value })}
-                                className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                              />
-                            </label>
-                          </>
-                        )}
-
-                        {selectedBlock.type === 'Divider' && (
-                          <>
-                            <label className="block">
-                              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                                Divider color
-                              </span>
-                              <input
-                                type="text"
-                                value={selectedBlock.dividerColor ?? ''}
-                                onChange={(event) => handleUpdateSelectedBlock({ dividerColor: event.target.value })}
-                                className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                              />
-                            </label>
-                            <label className="block">
-                              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                                Thickness
-                              </span>
-                              <input
-                                type="number"
-                                min={1}
-                                value={selectedBlock.dividerThickness ?? ''}
-                                onChange={(event) => handleUpdateSelectedBlock({ dividerThickness: toOptionalNumber(event.target.value) })}
-                                className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                              />
-                            </label>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </aside>
-  )
-}
-
-type BuilderCanvasProps = {
-  draft: TemplateDraft
-  selectedSectionId: string | null
-  selectedColumnId: string | null
-  selectedBlockId: string | null
-  draggedSectionId: string | null
-  draggedBlock: DraggedBlock | null
-  sectionDropTargetId: string | null
-  columnDropTargetId: string | null
-  blockDropTargetId: string | null
-  handleSelectSection: (sectionId: string) => void
-  handleSelectColumn: (sectionId: string, columnId: string) => void
-  handleSelectBlock: (sectionId: string, columnId: string, blockId: string) => void
-  handleSectionDragStart: (sectionId: string) => void
-  handleSectionDrop: (targetSectionId: string) => void
-  handleBlockDragStart: (sectionId: string, columnId: string, blockId: string) => void
-  handleBlockDropOnColumn: (targetSectionId: string, targetColumnId: string) => void
-  handleBlockDropOnBlock: (targetSectionId: string, targetColumnId: string, targetBlockId: string) => void
-  setSectionDropTargetId: (sectionId: string | null) => void
-  setColumnDropTargetId: (columnId: string | null) => void
-  setBlockDropTargetId: (blockId: string | null) => void
-  clearDragState: () => void
-  handleStartBuilder: (preset?: BuilderPreset) => void
-  handleAddSection: (columnCount: number) => void
-}
-
-function BuilderCanvas({
-  draft,
-  selectedSectionId,
-  selectedColumnId,
-  selectedBlockId,
-  draggedSectionId,
-  draggedBlock,
-  sectionDropTargetId,
-  columnDropTargetId,
-  blockDropTargetId,
-  handleSelectSection,
-  handleSelectColumn,
-  handleSelectBlock,
-  handleSectionDragStart,
-  handleSectionDrop,
-  handleBlockDragStart,
-  handleBlockDropOnColumn,
-  handleBlockDropOnBlock,
-  setSectionDropTargetId,
-  setColumnDropTargetId,
-  setBlockDropTargetId,
-  clearDragState,
-  handleStartBuilder,
-  handleAddSection,
-}: BuilderCanvasProps) {
-  if (!draft.editorDocument) {
-    return (
-      <section className="rounded-[28px] border border-white/10 bg-slate-900/50 p-6 shadow-2xl shadow-black/20">
-        <div className="flex h-full min-h-[720px] items-center justify-center rounded-[28px] border border-dashed border-white/10 bg-slate-950/40 px-8 text-center">
-          <div className="max-w-xl">
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-300">Builder canvas</p>
-            <h2 className="mt-3 text-3xl font-semibold text-white">Start a visual layout</h2>
-            <p className="mt-3 text-sm text-slate-400">
-              This template is still MJML-only. Choose a preset or section layout to start a structured builder draft on this dedicated page.
-            </p>
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <button
-                type="button"
-                onClick={() => handleStartBuilder('hero')}
-                className="rounded-2xl bg-sky-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-sky-400"
-              >
-                Start with hero preset
-              </button>
-              <button
-                type="button"
-                onClick={() => handleAddSection(1)}
-                className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/5"
-              >
-                Start blank section
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-    )
-  }
-
-  return (
-    <section className="rounded-[28px] border border-white/10 bg-slate-900/50 p-6 shadow-2xl shadow-black/20">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-            Builder canvas
-          </p>
-          <p className="mt-2 text-sm text-slate-400">
-            Select sections and blocks on the canvas, drag them to reorder, then use the left sidebar to add content, layouts, presets, and styles.
-          </p>
-        </div>
-        <span className="rounded-full border border-white/10 px-3 py-1 text-xs font-semibold text-slate-300">
-          {draft.editorDocument.sections.length} section{draft.editorDocument.sections.length === 1 ? '' : 's'}
-        </span>
-      </div>
-
-      <div className="mt-6 min-h-[720px] rounded-[28px] border border-white/10 bg-slate-950/60 p-5">
-        <div className="mx-auto max-w-[760px] space-y-5">
-          {draft.editorDocument.sections.map((section, sectionIndex) => {
-            const isSectionSelected = section.id === selectedSectionId
-
-            return (
-              <div
-                key={section.id}
-                draggable
-                onDragStart={() => handleSectionDragStart(section.id)}
-                onDragOver={(event) => {
-                  if (!draggedSectionId || draggedSectionId === section.id) {
-                    return
-                  }
-
-                  event.preventDefault()
-                  setSectionDropTargetId(section.id)
-                }}
-                onDragLeave={() => {
-                  if (sectionDropTargetId === section.id) {
-                    setSectionDropTargetId(null)
-                  }
-                }}
-                onDrop={(event) => {
-                  event.preventDefault()
-                  handleSectionDrop(section.id)
-                }}
-                onDragEnd={clearDragState}
-                onClick={() => handleSelectSection(section.id)}
-                className={`block w-full rounded-[28px] border p-5 text-left transition ${
-                  sectionDropTargetId === section.id && draggedSectionId !== section.id
-                    ? 'border-amber-400/60 bg-amber-400/10 shadow-lg shadow-amber-400/10'
-                    : isSectionSelected
-                      ? 'border-sky-400/60 bg-sky-500/10 shadow-lg shadow-sky-500/10'
-                      : 'border-white/10 bg-white hover:border-white/20'
-                } ${draggedSectionId === section.id ? 'opacity-60' : ''}`}
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                      Section {sectionIndex + 1}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {section.columns.length} column{section.columns.length === 1 ? '' : 's'} · padding {section.padding ?? 24}px
-                    </p>
-                  </div>
-                  <div
-                    className="h-5 w-5 rounded-full border border-slate-300"
-                    style={{ backgroundColor: section.backgroundColor ?? '#ffffff' }}
-                  />
-                </div>
-
-                <div
-                  className="mt-5 grid gap-4"
-                  style={{ gridTemplateColumns: `repeat(${section.columns.length}, minmax(0, 1fr))` }}
-                >
-                  {section.columns.map((column) => (
-                    <div
-                      key={column.id}
-                      onDragOver={(event) => {
-                        if (!draggedBlock) {
-                          return
-                        }
-
-                        event.preventDefault()
-                        setColumnDropTargetId(column.id)
-                        setBlockDropTargetId(null)
-                      }}
-                      onDragLeave={() => {
-                        if (columnDropTargetId === column.id) {
-                          setColumnDropTargetId(null)
-                        }
-                      }}
-                      onDrop={(event) => {
-                        if (!draggedBlock) {
-                          return
-                        }
-
-                        event.preventDefault()
-                        handleBlockDropOnColumn(section.id, column.id)
-                      }}
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        handleSelectColumn(section.id, column.id)
-                      }}
-                      className={`space-y-3 rounded-3xl border p-4 text-left transition ${
-                        blockDropTargetId === null && columnDropTargetId === column.id && draggedBlock
-                          ? 'border-amber-400/60 bg-amber-50 shadow-sm shadow-amber-200/70'
-                          : selectedColumnId === column.id
-                            ? 'border-sky-400/60 bg-sky-50 shadow-sm shadow-sky-200/70'
-                            : 'border-slate-200 bg-slate-50 hover:border-slate-300'
-                      }`}
-                    >
-                      {column.blocks.length === 0 ? (
-                        <div className="rounded-2xl border border-dashed border-slate-300 px-4 py-8 text-center text-sm text-slate-500">
-                          Empty column
-                          <span className="mt-2 block text-xs text-slate-400">Select this column, then add a block from the sidebar.</span>
-                        </div>
-                      ) : (
-                        column.blocks.map((block) => (
-                          <div
-                            key={block.id}
-                            draggable
-                            onDragStart={(event) => {
-                              event.stopPropagation()
-                              handleBlockDragStart(section.id, column.id, block.id)
-                            }}
-                            onDragOver={(event) => {
-                              if (!draggedBlock || draggedBlock.blockId === block.id) {
-                                return
-                              }
-
-                              event.preventDefault()
-                              event.stopPropagation()
-                              setColumnDropTargetId(null)
-                              setBlockDropTargetId(block.id)
-                            }}
-                            onDragLeave={() => {
-                              if (blockDropTargetId === block.id) {
-                                setBlockDropTargetId(null)
-                              }
-                            }}
-                            onDrop={(event) => {
-                              if (!draggedBlock) {
-                                return
-                              }
-
-                              event.preventDefault()
-                              event.stopPropagation()
-                              handleBlockDropOnBlock(section.id, column.id, block.id)
-                            }}
-                            onDragEnd={clearDragState}
-                            onClick={(event) => {
-                              event.stopPropagation()
-                              handleSelectBlock(section.id, column.id, block.id)
-                            }}
-                            className={`block w-full rounded-2xl border p-4 text-left transition ${
-                              blockDropTargetId === block.id && draggedBlock?.blockId !== block.id
-                                ? 'border-amber-400/60 bg-amber-50 shadow-sm shadow-amber-200/70'
-                                : selectedBlockId === block.id
-                                  ? 'border-sky-400/60 bg-sky-50 shadow-sm shadow-sky-200/70'
-                                  : 'border-slate-200 bg-white hover:border-slate-300'
-                            } ${draggedBlock?.blockId === block.id ? 'opacity-60' : ''}`}
-                          >
-                            <CanvasBlockPreview block={block} />
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    </section>
-  )
-}
-
-function CanvasBlockPreview({ block }: { block: EditorBlock }) {
-  if (block.type === 'Hero') {
-    return (
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Heading</p>
-        <p
-          className="mt-2 font-semibold"
-          style={{ color: block.textColor ?? '#1f2937', fontSize: `${block.fontSize ?? 24}px`, textAlign: (block.alignment ?? 'Left').toLowerCase() as 'left' | 'center' | 'right' }}
-        >
-          {block.textContent}
-        </p>
-      </div>
-    )
-  }
-
-  if (block.type === 'Text') {
-    return (
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Paragraph</p>
-        <p
-          className="mt-2 leading-6"
-          style={{ color: block.textColor ?? '#475569', fontSize: `${block.fontSize ?? 16}px`, textAlign: (block.alignment ?? 'Left').toLowerCase() as 'left' | 'center' | 'right' }}
-        >
-          {block.textContent}
-        </p>
-      </div>
-    )
-  }
-
-  if (block.type === 'Image') {
-    return (
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Image</p>
-        <div className="mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-          {block.imageUrl ? (
-            <img src={block.imageUrl} alt={block.altText ?? 'Campaign visual'} className="h-36 w-full object-cover" />
-          ) : (
-            <div className="flex h-36 items-center justify-center text-sm text-slate-500">No image URL</div>
-          )}
-        </div>
-      </div>
-    )
-  }
-
-  if (block.type === 'Button') {
-    return (
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Button</p>
-        <div className="mt-3">
-          <span
-            className="inline-flex rounded-xl px-4 py-2 text-sm font-semibold"
-            style={{
-              backgroundColor: block.backgroundColor ?? '#2563eb',
-              color: block.textColor ?? '#ffffff',
-            }}
-          >
-            {block.actionLabel || 'Button'}
-          </span>
-        </div>
-      </div>
-    )
-  }
-
-  if (block.type === 'Spacer') {
-    return (
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Spacer</p>
-        <div className="mt-3 rounded-full border border-dashed border-slate-300 bg-slate-50 text-center text-xs text-slate-500" style={{ height: `${block.spacing ?? 24}px`, lineHeight: `${block.spacing ?? 24}px` }}>
-          {block.spacing ?? 24}px
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div>
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Divider</p>
-      <div
-        className="mt-4"
-        style={{
-          borderTop: `${block.dividerThickness ?? 1}px solid ${block.dividerColor ?? '#d1d5db'}`,
-        }}
-      />
     </div>
   )
 }

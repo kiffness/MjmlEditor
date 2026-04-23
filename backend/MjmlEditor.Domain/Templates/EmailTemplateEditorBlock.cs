@@ -8,6 +8,8 @@ public sealed class EmailTemplateEditorBlock
 
     public string? TextContent { get; }
 
+    public string? SecondaryText { get; }
+
     public string? ImageUrl { get; }
 
     public string? AltText { get; }
@@ -22,7 +24,19 @@ public sealed class EmailTemplateEditorBlock
 
     public EmailTemplateEditorAlignment? Alignment { get; }
 
+    public string? FontFamily { get; }
+
+    public string? FontWeight { get; }
+
     public int? FontSize { get; }
+
+    public int? LineHeight { get; }
+
+    public int? LetterSpacing { get; }
+
+    public EmailTemplateEditorTextTransform? TextTransform { get; }
+
+    public EmailTemplateEditorTextDecoration? TextDecoration { get; }
 
     public int? Spacing { get; }
 
@@ -30,10 +44,21 @@ public sealed class EmailTemplateEditorBlock
 
     public int? DividerThickness { get; }
 
+    public string? BorderColor { get; }
+
+    public int? BorderWidth { get; }
+
+    public int? BorderRadius { get; }
+
+    public int? WidthPercentage { get; }
+
+    public IReadOnlyList<EmailTemplateEditorBlockItem> Items { get; }
+
     public static EmailTemplateEditorBlock Create(
         string id,
         EmailTemplateEditorBlockType type,
         string? textContent,
+        string? secondaryText,
         string? imageUrl,
         string? altText,
         string? actionLabel,
@@ -41,25 +66,48 @@ public sealed class EmailTemplateEditorBlock
         string? backgroundColor,
         string? textColor,
         EmailTemplateEditorAlignment? alignment,
+        string? fontFamily,
+        string? fontWeight,
         int? fontSize,
+        int? lineHeight,
+        int? letterSpacing,
+        EmailTemplateEditorTextTransform? textTransform,
+        EmailTemplateEditorTextDecoration? textDecoration,
         int? spacing,
         string? dividerColor,
-        int? dividerThickness)
+        int? dividerThickness,
+        string? borderColor,
+        int? borderWidth,
+        int? borderRadius,
+        int? widthPercentage,
+        IReadOnlyList<EmailTemplateEditorBlockItem>? items)
     {
         ValidateType(type);
         ValidateAlignment(alignment);
+        ValidateTextTransform(textTransform);
+        ValidateTextDecoration(textDecoration);
         ValidateOptionalPositive(fontSize, nameof(fontSize));
+        ValidateOptionalPositive(lineHeight, nameof(lineHeight));
+        ValidateOptionalNonNegative(letterSpacing, nameof(letterSpacing));
         ValidateOptionalPositive(spacing, nameof(spacing));
         ValidateOptionalPositive(dividerThickness, nameof(dividerThickness));
+        ValidateOptionalNonNegative(borderWidth, nameof(borderWidth));
+        ValidateOptionalNonNegative(borderRadius, nameof(borderRadius));
+        ValidateOptionalRange(widthPercentage, nameof(widthPercentage), 1, 100);
 
         var normalizedTextContent = NormalizeOptional(textContent);
+        var normalizedSecondaryText = NormalizeOptional(secondaryText);
         var normalizedImageUrl = NormalizeOptional(imageUrl);
         var normalizedAltText = NormalizeOptional(altText);
         var normalizedActionLabel = NormalizeOptional(actionLabel);
         var normalizedActionUrl = NormalizeOptional(actionUrl);
         var normalizedBackgroundColor = NormalizeOptional(backgroundColor);
         var normalizedTextColor = NormalizeOptional(textColor);
+        var normalizedFontFamily = NormalizeOptional(fontFamily);
+        var normalizedFontWeight = NormalizeOptional(fontWeight);
         var normalizedDividerColor = NormalizeOptional(dividerColor);
+        var normalizedBorderColor = NormalizeOptional(borderColor);
+        var normalizedItems = NormalizeItems(items);
 
         ValidateTypeSpecificFields(
             type,
@@ -67,12 +115,14 @@ public sealed class EmailTemplateEditorBlock
             normalizedImageUrl,
             normalizedActionLabel,
             normalizedActionUrl,
-            spacing);
+            spacing,
+            normalizedItems);
 
         return new EmailTemplateEditorBlock(
             NormalizeRequired(id, nameof(id)),
             type,
             normalizedTextContent,
+            normalizedSecondaryText,
             normalizedImageUrl,
             normalizedAltText,
             normalizedActionLabel,
@@ -80,16 +130,28 @@ public sealed class EmailTemplateEditorBlock
             normalizedBackgroundColor,
             normalizedTextColor,
             alignment,
+            normalizedFontFamily,
+            normalizedFontWeight,
             fontSize,
+            lineHeight,
+            letterSpacing,
+            textTransform,
+            textDecoration,
             spacing,
             normalizedDividerColor,
-            dividerThickness);
+            dividerThickness,
+            normalizedBorderColor,
+            borderWidth,
+            borderRadius,
+            widthPercentage,
+            normalizedItems);
     }
 
     public static EmailTemplateEditorBlock Restore(
         string id,
         EmailTemplateEditorBlockType type,
         string? textContent,
+        string? secondaryText,
         string? imageUrl,
         string? altText,
         string? actionLabel,
@@ -97,15 +159,27 @@ public sealed class EmailTemplateEditorBlock
         string? backgroundColor,
         string? textColor,
         EmailTemplateEditorAlignment? alignment,
+        string? fontFamily,
+        string? fontWeight,
         int? fontSize,
+        int? lineHeight,
+        int? letterSpacing,
+        EmailTemplateEditorTextTransform? textTransform,
+        EmailTemplateEditorTextDecoration? textDecoration,
         int? spacing,
         string? dividerColor,
-        int? dividerThickness)
+        int? dividerThickness,
+        string? borderColor,
+        int? borderWidth,
+        int? borderRadius,
+        int? widthPercentage,
+        IReadOnlyList<EmailTemplateEditorBlockItem>? items)
     {
         return Create(
             id,
             type,
             textContent,
+            secondaryText,
             imageUrl,
             altText,
             actionLabel,
@@ -113,10 +187,21 @@ public sealed class EmailTemplateEditorBlock
             backgroundColor,
             textColor,
             alignment,
+            fontFamily,
+            fontWeight,
             fontSize,
+            lineHeight,
+            letterSpacing,
+            textTransform,
+            textDecoration,
             spacing,
             dividerColor,
-            dividerThickness);
+            dividerThickness,
+            borderColor,
+            borderWidth,
+            borderRadius,
+            widthPercentage,
+            items);
     }
 
     public EmailTemplateEditorBlock Clone()
@@ -125,6 +210,7 @@ public sealed class EmailTemplateEditorBlock
             Id,
             Type,
             TextContent,
+            SecondaryText,
             ImageUrl,
             AltText,
             ActionLabel,
@@ -132,16 +218,28 @@ public sealed class EmailTemplateEditorBlock
             BackgroundColor,
             TextColor,
             Alignment,
+            FontFamily,
+            FontWeight,
             FontSize,
+            LineHeight,
+            LetterSpacing,
+            TextTransform,
+            TextDecoration,
             Spacing,
             DividerColor,
-            DividerThickness);
+            DividerThickness,
+            BorderColor,
+            BorderWidth,
+            BorderRadius,
+            WidthPercentage,
+            Items.Select(item => item.Clone()).ToArray());
     }
 
     private EmailTemplateEditorBlock(
         string id,
         EmailTemplateEditorBlockType type,
         string? textContent,
+        string? secondaryText,
         string? imageUrl,
         string? altText,
         string? actionLabel,
@@ -149,14 +247,26 @@ public sealed class EmailTemplateEditorBlock
         string? backgroundColor,
         string? textColor,
         EmailTemplateEditorAlignment? alignment,
+        string? fontFamily,
+        string? fontWeight,
         int? fontSize,
+        int? lineHeight,
+        int? letterSpacing,
+        EmailTemplateEditorTextTransform? textTransform,
+        EmailTemplateEditorTextDecoration? textDecoration,
         int? spacing,
         string? dividerColor,
-        int? dividerThickness)
+        int? dividerThickness,
+        string? borderColor,
+        int? borderWidth,
+        int? borderRadius,
+        int? widthPercentage,
+        IReadOnlyList<EmailTemplateEditorBlockItem> items)
     {
         Id = id;
         Type = type;
         TextContent = textContent;
+        SecondaryText = secondaryText;
         ImageUrl = imageUrl;
         AltText = altText;
         ActionLabel = actionLabel;
@@ -164,10 +274,21 @@ public sealed class EmailTemplateEditorBlock
         BackgroundColor = backgroundColor;
         TextColor = textColor;
         Alignment = alignment;
+        FontFamily = fontFamily;
+        FontWeight = fontWeight;
         FontSize = fontSize;
+        LineHeight = lineHeight;
+        LetterSpacing = letterSpacing;
+        TextTransform = textTransform;
+        TextDecoration = textDecoration;
         Spacing = spacing;
         DividerColor = dividerColor;
         DividerThickness = dividerThickness;
+        BorderColor = borderColor;
+        BorderWidth = borderWidth;
+        BorderRadius = borderRadius;
+        WidthPercentage = widthPercentage;
+        Items = items;
     }
 
     private static void ValidateType(EmailTemplateEditorBlockType type)
@@ -186,11 +307,43 @@ public sealed class EmailTemplateEditorBlock
         }
     }
 
+    private static void ValidateTextTransform(EmailTemplateEditorTextTransform? textTransform)
+    {
+        if (textTransform is not null && !Enum.IsDefined(textTransform.Value))
+        {
+            throw new ArgumentOutOfRangeException(nameof(textTransform), textTransform, "Unsupported editor text transform.");
+        }
+    }
+
+    private static void ValidateTextDecoration(EmailTemplateEditorTextDecoration? textDecoration)
+    {
+        if (textDecoration is not null && !Enum.IsDefined(textDecoration.Value))
+        {
+            throw new ArgumentOutOfRangeException(nameof(textDecoration), textDecoration, "Unsupported editor text decoration.");
+        }
+    }
+
     private static void ValidateOptionalPositive(int? value, string paramName)
     {
         if (value is not null && value <= 0)
         {
             throw new ArgumentOutOfRangeException(paramName, value, $"{paramName} must be positive when provided.");
+        }
+    }
+
+    private static void ValidateOptionalNonNegative(int? value, string paramName)
+    {
+        if (value is not null && value < 0)
+        {
+            throw new ArgumentOutOfRangeException(paramName, value, $"{paramName} must be non-negative when provided.");
+        }
+    }
+
+    private static void ValidateOptionalRange(int? value, string paramName, int min, int max)
+    {
+        if (value is not null && (value < min || value > max))
+        {
+            throw new ArgumentOutOfRangeException(paramName, value, $"{paramName} must be between {min} and {max} when provided.");
         }
     }
 
@@ -200,23 +353,44 @@ public sealed class EmailTemplateEditorBlock
         string? imageUrl,
         string? actionLabel,
         string? actionUrl,
-        int? spacing)
+        int? spacing,
+        IReadOnlyList<EmailTemplateEditorBlockItem> items)
     {
         switch (type)
         {
             case EmailTemplateEditorBlockType.Hero:
             case EmailTemplateEditorBlockType.Text:
+            case EmailTemplateEditorBlockType.Footer:
+            case EmailTemplateEditorBlockType.Badge:
+            case EmailTemplateEditorBlockType.Quote:
+            case EmailTemplateEditorBlockType.FeatureCard:
+            case EmailTemplateEditorBlockType.PromoBanner:
                 if (string.IsNullOrWhiteSpace(textContent))
                 {
-                    throw new ArgumentException("TextContent is required for hero and text blocks.", nameof(textContent));
+                    throw new ArgumentException("TextContent is required for this block type.", nameof(textContent));
+                }
+
+                break;
+
+            case EmailTemplateEditorBlockType.PropertyCard:
+            case EmailTemplateEditorBlockType.IconText:
+                if (string.IsNullOrWhiteSpace(textContent))
+                {
+                    throw new ArgumentException("TextContent is required for this block type.", nameof(textContent));
+                }
+
+                if (string.IsNullOrWhiteSpace(imageUrl))
+                {
+                    throw new ArgumentException("ImageUrl is required for this block type.", nameof(imageUrl));
                 }
 
                 break;
 
             case EmailTemplateEditorBlockType.Image:
+            case EmailTemplateEditorBlockType.Logo:
                 if (string.IsNullOrWhiteSpace(imageUrl))
                 {
-                    throw new ArgumentException("ImageUrl is required for image blocks.", nameof(imageUrl));
+                    throw new ArgumentException("ImageUrl is required for this block type.", nameof(imageUrl));
                 }
 
                 break;
@@ -241,7 +415,28 @@ public sealed class EmailTemplateEditorBlock
                 }
 
                 break;
+
+            case EmailTemplateEditorBlockType.SocialLinks:
+            case EmailTemplateEditorBlockType.LinkList:
+                if (items.Count == 0)
+                {
+                    throw new ArgumentException("At least one item is required for this block type.", nameof(items));
+                }
+
+                break;
         }
+    }
+
+    private static IReadOnlyList<EmailTemplateEditorBlockItem> NormalizeItems(IReadOnlyList<EmailTemplateEditorBlockItem>? items)
+    {
+        if (items is null || items.Count == 0)
+        {
+            return [];
+        }
+
+        return items
+            .Select(item => item.Clone())
+            .ToArray();
     }
 
     private static string NormalizeRequired(string value, string paramName)

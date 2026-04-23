@@ -155,6 +155,13 @@ public static class EmailTemplateValidation
                         "Column widthPercentage must be between 1 and 100."));
                 }
 
+                if (column.VerticalAlignment is not null && !Enum.IsDefined(column.VerticalAlignment.Value))
+                {
+                    errors.Add(new ValidationError(
+                        $"EditorDocument.Sections[{sectionIndex}].Columns[{columnIndex}].VerticalAlignment",
+                        "A supported column vertical alignment is required."));
+                }
+
                 for (var blockIndex = 0; blockIndex < column.Blocks.Count; blockIndex++)
                 {
                     var block = column.Blocks[blockIndex];
@@ -175,9 +182,29 @@ public static class EmailTemplateValidation
                         errors.Add(new ValidationError($"{fieldPrefix}.Alignment", "A supported editor alignment is required."));
                     }
 
+                    if (block.TextTransform is not null && !Enum.IsDefined(block.TextTransform.Value))
+                    {
+                        errors.Add(new ValidationError($"{fieldPrefix}.TextTransform", "A supported text transform is required."));
+                    }
+
+                    if (block.TextDecoration is not null && !Enum.IsDefined(block.TextDecoration.Value))
+                    {
+                        errors.Add(new ValidationError($"{fieldPrefix}.TextDecoration", "A supported text decoration is required."));
+                    }
+
                     if (block.FontSize is not null && block.FontSize <= 0)
                     {
                         errors.Add(new ValidationError($"{fieldPrefix}.FontSize", "FontSize must be positive when provided."));
+                    }
+
+                    if (block.LineHeight is not null && block.LineHeight <= 0)
+                    {
+                        errors.Add(new ValidationError($"{fieldPrefix}.LineHeight", "LineHeight must be positive when provided."));
+                    }
+
+                    if (block.LetterSpacing is not null && block.LetterSpacing < 0)
+                    {
+                        errors.Add(new ValidationError($"{fieldPrefix}.LetterSpacing", "LetterSpacing must be zero or greater when provided."));
                     }
 
                     if (block.Spacing is not null && block.Spacing <= 0)
@@ -190,21 +217,79 @@ public static class EmailTemplateValidation
                         errors.Add(new ValidationError($"{fieldPrefix}.DividerThickness", "DividerThickness must be positive when provided."));
                     }
 
+                    if (block.BorderWidth is not null && block.BorderWidth < 0)
+                    {
+                        errors.Add(new ValidationError($"{fieldPrefix}.BorderWidth", "BorderWidth must be zero or greater when provided."));
+                    }
+
+                    if (block.BorderRadius is not null && block.BorderRadius < 0)
+                    {
+                        errors.Add(new ValidationError($"{fieldPrefix}.BorderRadius", "BorderRadius must be zero or greater when provided."));
+                    }
+
+                    if (block.WidthPercentage is not null && (block.WidthPercentage <= 0 || block.WidthPercentage > 100))
+                    {
+                        errors.Add(new ValidationError($"{fieldPrefix}.WidthPercentage", "WidthPercentage must be between 1 and 100 when provided."));
+                    }
+
+                    var items = block.Items ?? [];
+
+                    for (var itemIndex = 0; itemIndex < items.Count; itemIndex++)
+                    {
+                        var item = items[itemIndex];
+                        var itemPrefix = $"{fieldPrefix}.Items[{itemIndex}]";
+
+                        if (string.IsNullOrWhiteSpace(item.Id))
+                        {
+                            errors.Add(new ValidationError($"{itemPrefix}.Id", "Item id is required."));
+                        }
+
+                        if (string.IsNullOrWhiteSpace(item.Label))
+                        {
+                            errors.Add(new ValidationError($"{itemPrefix}.Label", "Item label is required."));
+                        }
+
+                        if (string.IsNullOrWhiteSpace(item.Url))
+                        {
+                            errors.Add(new ValidationError($"{itemPrefix}.Url", "Item URL is required."));
+                        }
+                    }
+
                     switch (block.Type)
                     {
                         case EmailTemplateEditorBlockType.Hero:
                         case EmailTemplateEditorBlockType.Text:
+                        case EmailTemplateEditorBlockType.Footer:
+                        case EmailTemplateEditorBlockType.Badge:
+                        case EmailTemplateEditorBlockType.Quote:
+                        case EmailTemplateEditorBlockType.FeatureCard:
+                        case EmailTemplateEditorBlockType.PromoBanner:
                             if (string.IsNullOrWhiteSpace(block.TextContent))
                             {
-                                errors.Add(new ValidationError($"{fieldPrefix}.TextContent", "TextContent is required for hero and text blocks."));
+                                errors.Add(new ValidationError($"{fieldPrefix}.TextContent", "TextContent is required for this block type."));
+                            }
+
+                            break;
+
+                        case EmailTemplateEditorBlockType.PropertyCard:
+                        case EmailTemplateEditorBlockType.IconText:
+                            if (string.IsNullOrWhiteSpace(block.TextContent))
+                            {
+                                errors.Add(new ValidationError($"{fieldPrefix}.TextContent", "TextContent is required for this block type."));
+                            }
+
+                            if (string.IsNullOrWhiteSpace(block.ImageUrl))
+                            {
+                                errors.Add(new ValidationError($"{fieldPrefix}.ImageUrl", "ImageUrl is required for this block type."));
                             }
 
                             break;
 
                         case EmailTemplateEditorBlockType.Image:
+                        case EmailTemplateEditorBlockType.Logo:
                             if (string.IsNullOrWhiteSpace(block.ImageUrl))
                             {
-                                errors.Add(new ValidationError($"{fieldPrefix}.ImageUrl", "ImageUrl is required for image blocks."));
+                                errors.Add(new ValidationError($"{fieldPrefix}.ImageUrl", "ImageUrl is required for this block type."));
                             }
 
                             break;
@@ -226,6 +311,15 @@ public static class EmailTemplateValidation
                             if (block.Spacing is null)
                             {
                                 errors.Add(new ValidationError($"{fieldPrefix}.Spacing", "Spacing is required for spacer blocks."));
+                            }
+
+                            break;
+
+                        case EmailTemplateEditorBlockType.SocialLinks:
+                        case EmailTemplateEditorBlockType.LinkList:
+                            if (items.Count == 0)
+                            {
+                                errors.Add(new ValidationError($"{fieldPrefix}.Items", "At least one item is required for this block type."));
                             }
 
                             break;

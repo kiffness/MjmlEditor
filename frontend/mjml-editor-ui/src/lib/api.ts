@@ -39,13 +39,39 @@ export type TemplateSummaryDto = {
 }
 
 export type EditorAlignment = 'Left' | 'Center' | 'Right'
+export type EditorVerticalAlignment = 'Top' | 'Middle' | 'Bottom'
+export type EditorTextTransform = 'None' | 'Uppercase' | 'Lowercase' | 'Capitalize'
+export type EditorTextDecoration = 'None' | 'Underline' | 'LineThrough'
 
-export type EditorBlockType = 'Hero' | 'Text' | 'Image' | 'Button' | 'Spacer' | 'Divider'
+export type EditorBlockType =
+  | 'Hero'
+  | 'Text'
+  | 'Image'
+  | 'Button'
+  | 'Spacer'
+  | 'Divider'
+  | 'Logo'
+  | 'SocialLinks'
+  | 'Footer'
+  | 'LinkList'
+  | 'Badge'
+  | 'Quote'
+  | 'PropertyCard'
+  | 'FeatureCard'
+  | 'IconText'
+  | 'PromoBanner'
+
+export type EditorBlockItem = {
+  id: string
+  label: string
+  url: string
+}
 
 export type EditorBlock = {
   id: string
   type: EditorBlockType
   textContent?: string | null
+  secondaryText?: string | null
   imageUrl?: string | null
   altText?: string | null
   actionLabel?: string | null
@@ -53,15 +79,28 @@ export type EditorBlock = {
   backgroundColor?: string | null
   textColor?: string | null
   alignment?: EditorAlignment | null
+  fontFamily?: string | null
+  fontWeight?: string | null
   fontSize?: number | null
+  lineHeight?: number | null
+  letterSpacing?: number | null
+  textTransform?: EditorTextTransform | null
+  textDecoration?: EditorTextDecoration | null
   spacing?: number | null
   dividerColor?: string | null
   dividerThickness?: number | null
+  borderColor?: string | null
+  borderWidth?: number | null
+  borderRadius?: number | null
+  widthPercentage?: number | null
+  items?: EditorBlockItem[] | null
 }
 
 export type EditorColumn = {
   id: string
   widthPercentage: number
+  backgroundColor?: string | null
+  verticalAlignment?: EditorVerticalAlignment | null
   blocks: EditorBlock[]
 }
 

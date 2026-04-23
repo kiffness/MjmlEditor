@@ -7,5 +7,15 @@ public enum EmailTemplateEditorBlockType
     Image = 3,
     Button = 4,
     Spacer = 5,
-    Divider = 6
+    Divider = 6,
+    Logo = 7,
+    SocialLinks = 8,
+    Footer = 9,
+    LinkList = 10,
+    Badge = 11,
+    Quote = 12,
+    PropertyCard = 13,
+    FeatureCard = 14,
+    IconText = 15,
+    PromoBanner = 16
 }

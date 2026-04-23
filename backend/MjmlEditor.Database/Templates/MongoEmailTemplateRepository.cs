@@ -166,10 +166,13 @@ internal sealed class MongoEmailTemplateRepository : IEmailTemplateRepository
                 section.Columns.Select(column => EmailTemplateEditorColumn.Restore(
                     column.Id,
                     column.WidthPercentage,
+                    column.BackgroundColor,
+                    column.VerticalAlignment,
                     column.Blocks.Select(block => EmailTemplateEditorBlock.Restore(
                         block.Id,
                         block.Type,
                         block.TextContent,
+                        block.SecondaryText,
                         block.ImageUrl,
                         block.AltText,
                         block.ActionLabel,
@@ -177,10 +180,24 @@ internal sealed class MongoEmailTemplateRepository : IEmailTemplateRepository
                         block.BackgroundColor,
                         block.TextColor,
                         block.Alignment,
+                        block.FontFamily,
+                        block.FontWeight,
                         block.FontSize,
+                        block.LineHeight,
+                        block.LetterSpacing,
+                        block.TextTransform,
+                        block.TextDecoration,
                         block.Spacing,
                         block.DividerColor,
-                        block.DividerThickness)).ToArray())).ToArray())).ToArray());
+                        block.DividerThickness,
+                        block.BorderColor,
+                        block.BorderWidth,
+                        block.BorderRadius,
+                        block.WidthPercentage,
+                        block.Items?.Select(item => EmailTemplateEditorBlockItem.Restore(
+                            item.Id,
+                            item.Label,
+                            item.Url)).ToArray() ?? [])).ToArray())).ToArray())).ToArray());
     }
 
     private static EmailTemplateEditorDocument MapToDocument(Domain.Templates.EmailTemplateEditorDocument document)
@@ -197,11 +214,14 @@ internal sealed class MongoEmailTemplateRepository : IEmailTemplateRepository
                 {
                     Id = column.Id,
                     WidthPercentage = column.WidthPercentage,
+                    BackgroundColor = column.BackgroundColor,
+                    VerticalAlignment = column.VerticalAlignment,
                     Blocks = column.Blocks.Select(block => new EmailTemplateEditorBlockDocument
                     {
                         Id = block.Id,
                         Type = block.Type,
                         TextContent = block.TextContent,
+                        SecondaryText = block.SecondaryText,
                         ImageUrl = block.ImageUrl,
                         AltText = block.AltText,
                         ActionLabel = block.ActionLabel,
@@ -209,10 +229,26 @@ internal sealed class MongoEmailTemplateRepository : IEmailTemplateRepository
                         BackgroundColor = block.BackgroundColor,
                         TextColor = block.TextColor,
                         Alignment = block.Alignment,
+                        FontFamily = block.FontFamily,
+                        FontWeight = block.FontWeight,
                         FontSize = block.FontSize,
+                        LineHeight = block.LineHeight,
+                        LetterSpacing = block.LetterSpacing,
+                        TextTransform = block.TextTransform,
+                        TextDecoration = block.TextDecoration,
                         Spacing = block.Spacing,
                         DividerColor = block.DividerColor,
-                        DividerThickness = block.DividerThickness
+                        DividerThickness = block.DividerThickness,
+                        BorderColor = block.BorderColor,
+                        BorderWidth = block.BorderWidth,
+                        BorderRadius = block.BorderRadius,
+                        WidthPercentage = block.WidthPercentage,
+                        Items = block.Items.Select(item => new EmailTemplateEditorBlockItemDocument
+                        {
+                            Id = item.Id,
+                            Label = item.Label,
+                            Url = item.Url
+                        }).ToArray()
                     }).ToArray()
                 }).ToArray()
             }).ToArray()
