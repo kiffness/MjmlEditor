@@ -768,26 +768,19 @@ function CanvasBlockPreview({
   }
 
   if (block.type === 'Button') {
+    // Don't apply frameStyle here — backgroundColor/border are button-specific and must
+    // only appear on the button element itself, not the full-width frame container.
     return (
-      <div style={frameStyle} className="rounded-2xl px-1 py-1">
+      <div className="rounded-2xl px-1 py-1">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Button</p>
         {isSelected ? (
           <div className="mt-3">
             <InlineCanvasInput value={block.actionLabel ?? ''} placeholder="Button label" onChange={(value) => onUpdateBlock({ actionLabel: value })} />
           </div>
         ) : (
-          <div className="mt-3">
-            <div
-              data-testid={`builder-button-preview-${block.id}`}
-              className="max-w-full"
-              style={{
-                width: explicitContentWidth,
-                maxWidth: explicitButtonPreviewMaxWidth,
-                marginLeft: block.alignment === 'Center' || block.alignment === 'Right' ? 'auto' : undefined,
-                marginRight: block.alignment === 'Left' || block.alignment === 'Center' ? 'auto' : undefined,
-              }}
-            >
+          <div className="mt-3 flex" style={{ justifyContent: toFlexJustify(block.alignment) }}>
             <span
+              data-testid={`builder-button-preview-${block.id}`}
               className="inline-flex px-4 py-2 text-sm"
               style={{
                 backgroundColor: block.backgroundColor ?? '#2563eb',
@@ -795,15 +788,14 @@ function CanvasBlockPreview({
                 borderColor: block.borderColor ?? undefined,
                 borderWidth: block.borderWidth ?? undefined,
                 borderStyle: block.borderWidth ? 'solid' : undefined,
-                width: explicitContentWidth ? '100%' : undefined,
-                maxWidth: '100%',
+                width: explicitContentWidth,
+                maxWidth: explicitButtonPreviewMaxWidth,
                 justifyContent: 'center',
                 ...getBlockTextStyle(block, { color: '#ffffff', fontSize: 14, fontWeight: '600' }),
               }}
             >
               {block.actionLabel || 'Button'}
             </span>
-            </div>
           </div>
         )}
       </div>

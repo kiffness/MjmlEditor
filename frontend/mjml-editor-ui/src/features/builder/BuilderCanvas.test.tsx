@@ -96,17 +96,15 @@ describe('BuilderCanvas', () => {
       />,
     )
 
-    const buttonPreview = screen.getByText('Explore deal').closest('span')
-    const buttonWrapper = buttonPreview?.parentElement as HTMLDivElement | null
+    const buttonPreview = screen.getByTestId('builder-button-preview-button-1')
 
-    expect(buttonWrapper).toBeTruthy()
-    expect(buttonWrapper?.style.width).toBe('')
     expect(buttonPreview).toBeTruthy()
-    expect(buttonPreview?.style.width).toBe('')
-    expect(buttonPreview?.style.borderRadius).toBe('')
+    expect(buttonPreview.style.width).toBe('')
+    expect(buttonPreview.style.maxWidth).toBe('')
+    expect(buttonPreview.style.borderRadius).toBe('')
   })
 
-  it('uses an explicit wrapper width for percentage-sized button previews', () => {
+  it('uses an explicit width and maxWidth on the button span for percentage-sized button previews', () => {
     render(
       <BuilderCanvas
         {...createProps({
@@ -121,7 +119,7 @@ describe('BuilderCanvas', () => {
                     widthPercentage: 100,
                     blocks: [
                       {
-                        id: 'button-1',
+                        id: 'button-percent',
                         type: 'Button',
                         actionLabel: 'Available properties',
                         actionUrl: 'https://example.com',
@@ -141,13 +139,13 @@ describe('BuilderCanvas', () => {
       />,
     )
 
-    const buttonPreview = screen.getByText('Available properties').closest('span')
-    const buttonWrapper = buttonPreview?.parentElement as HTMLDivElement | null
+    const buttonPreview = screen.getByTestId('builder-button-preview-button-percent')
 
-    expect(buttonWrapper).toBeTruthy()
-    expect(buttonWrapper?.style.width).toBe('60%')
-    expect(buttonWrapper?.style.maxWidth).toBe('331px')
-    expect(buttonPreview?.style.width).toBe('100%')
-    expect(buttonPreview?.style.borderRadius).toBe('12px')
+    expect(buttonPreview).toBeTruthy()
+    expect(buttonPreview.style.width).toBe('60%')
+    expect(buttonPreview.style.maxWidth).toBe('331px')
+    expect(buttonPreview.style.borderRadius).toBe('12px')
+    // No full-width wrapper div — backgroundColor must NOT appear on any ancestor
+    expect(buttonPreview.parentElement?.style.backgroundColor).toBe('')
   })
 })
