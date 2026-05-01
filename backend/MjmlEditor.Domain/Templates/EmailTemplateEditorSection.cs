@@ -23,9 +23,9 @@ public sealed class EmailTemplateEditorSection
             throw new ArgumentException("At least one column is required.", nameof(columns));
         }
 
-        if (padding is not null && padding <= 0)
+        if (padding is not null && padding < 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(padding), padding, "Padding must be positive when provided.");
+            throw new ArgumentOutOfRangeException(nameof(padding), padding, "Padding must be zero or greater when provided.");
         }
 
         return new EmailTemplateEditorSection(

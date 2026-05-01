@@ -3,7 +3,9 @@ import {
   ApiError,
   clearStoredAuthToken,
   createTemplate,
+  defaultBrandLibrary,
   deleteTemplate,
+  type BrandLibraryDto,
   type EditorBlock,
   type EditorBlockItem,
   type EditorBlockType,
@@ -11,6 +13,7 @@ import {
   type EditorDocument,
   type EditorSection,
   getApiBaseUrl,
+  getBrandLibrary,
   getCurrentUser,
   getStoredAuthToken,
   getTemplate,
@@ -21,6 +24,7 @@ import {
   publishTemplate,
   renderMjml,
   rollbackTemplate,
+  saveBrandLibrary,
   type AuthenticatedUserDto,
   type MjmlRenderIssueDto,
   type TemplateDto,
@@ -50,6 +54,8 @@ import {
   moveItem,
   type TemplateDraft,
   toDraft,
+  applyBrandLibrary,
+  applyBrandToBlock,
 } from './features/builder/builderModel'
 import {
   cloneDraftState,
@@ -57,12 +63,14 @@ import {
   getTemplateDraftStateSignature,
   hasPersistedDraftChanges,
 } from './features/builder/draftState'
+import { BrandLibraryPage } from './features/brandlibrary/BrandLibraryPage'
 
 type StatusFilter = 'All' | TemplateStatus
 
 type AppRoute =
   | { kind: 'library' }
   | { kind: 'editor'; templateId: string }
+  | { kind: 'brand-library' }
 
 type PreviewViewport = 'desktop' | 'tablet' | 'mobile'
 
@@ -133,13 +141,17 @@ function parseAppRoute(pathname: string): AppRoute {
     }
   }
 
+  if (pathname === '/brand-library') {
+    return { kind: 'brand-library' }
+  }
+
   return { kind: 'library' }
 }
 
 function getPathForRoute(route: AppRoute) {
-  return route.kind === 'editor'
-    ? `/templates/${encodeURIComponent(route.templateId)}/editor`
-    : '/'
+  if (route.kind === 'editor') return `/templates/${encodeURIComponent(route.templateId)}/editor`
+  if (route.kind === 'brand-library') return '/brand-library'
+  return '/'
 }
 
 function App() {
@@ -194,6 +206,8 @@ function App() {
   const [sectionDropTargetId, setSectionDropTargetId] = useState<string | null>(null)
   const [columnDropTargetId, setColumnDropTargetId] = useState<string | null>(null)
   const [blockDropTargetId, setBlockDropTargetId] = useState<string | null>(null)
+  const [brandLibrary, setBrandLibrary] = useState<BrandLibraryDto>(defaultBrandLibrary)
+  const [brandLibraryReturnRoute, setBrandLibraryReturnRoute] = useState<AppRoute>({ kind: 'library' })
 
   const apiBaseUrl = getApiBaseUrl()
   const activeTenant = tenants.find((tenant) => tenant.id === tenantId) ?? null
@@ -202,6 +216,7 @@ function App() {
   const seedOverrideCommand = `${seedCommand} -- --Seed:TemplatesPerTenant=12`
   const isPreviewStale = draft !== null && previewMjmlSnapshot !== getPreviewSignature(draft)
   const isEditorRoute = route.kind === 'editor'
+  const isBrandLibraryRoute = route.kind === 'brand-library'
   const selection = useMemo(() => {
     const sections = draft?.editorDocument?.sections ?? []
 
@@ -640,6 +655,19 @@ function App() {
     }
   }, [currentUser, handleUnauthorized, revisionRefreshNonce, selectedTemplateId, tenantId])
 
+  useEffect(() => {
+    if (!currentUser || !tenantId) return
+    let isActive = true
+
+    void getBrandLibrary(tenantId).then((library) => {
+      if (isActive) setBrandLibrary(library)
+    }).catch(() => {
+      // Silently fall back to defaults if brand library cannot be loaded
+    })
+
+    return () => { isActive = false }
+  }, [currentUser, tenantId])
+
   function selectTenant(nextTenantId: string) {
     setIsTemplatesLoading(true)
     setActiveTenant(nextTenantId)
@@ -665,6 +693,23 @@ function App() {
     navigateToRoute({ kind: 'library' })
     setInfoMessage(null)
     setErrorMessage(null)
+  }
+
+  function navigateToBrandLibrary() {
+    setBrandLibraryReturnRoute(route)
+    navigateToRoute({ kind: 'brand-library' })
+    setInfoMessage(null)
+    setErrorMessage(null)
+  }
+
+  async function handleSaveBrandLibrary(library: BrandLibraryDto) {
+    try {
+      const saved = await saveBrandLibrary(tenantId, library)
+      setBrandLibrary(saved)
+      setInfoMessage('Brand library saved')
+    } catch (error) {
+      setErrorMessage(getErrorMessage(error, 'Unable to save brand library.'))
+    }
   }
 
   function handleRefreshWorkspace() {
@@ -783,12 +828,13 @@ function App() {
 
   function handleStartBuilder(preset: BuilderPreset = 'hero') {
     applyDraftUpdate((current) => {
+      const rawDocument = {
+        version: 1,
+        sections: createPresetSections(preset),
+      }
       const nextDraft = {
         ...current,
-        editorDocument: {
-          version: 1,
-          sections: createPresetSections(preset),
-        },
+        editorDocument: applyBrandLibrary(rawDocument, brandLibrary),
       }
 
       if (current.status === 'Published') {
@@ -827,9 +873,18 @@ function App() {
       return
     }
 
+    const newSections = createPresetSections(preset).map((section) => ({
+      ...section,
+      backgroundColor: brandLibrary.sectionDefaultBackgroundColor ?? section.backgroundColor,
+      columns: section.columns.map((col) => ({
+        ...col,
+        blocks: col.blocks.map((block) => applyBrandToBlock(block, brandLibrary)),
+      })),
+    }))
+
     updateEditorDocument((current) => ({
       ...current,
-      sections: [...current.sections, ...createPresetSections(preset)],
+      sections: [...current.sections, ...newSections],
     }))
     setActiveBuilderTab('presets')
   }
@@ -850,7 +905,7 @@ function App() {
       return
     }
 
-    const nextBlock = createDefaultBlock(type)
+    const nextBlock = applyBrandToBlock(createDefaultBlock(type), brandLibrary)
     updateEditorDocument((current) => ({
       ...current,
       sections: current.sections.map((section) => {
@@ -1147,6 +1202,8 @@ function App() {
     }
   }, [selectedBlockId, updateEditorDocument])
 
+
+
   function clearDragState() {
     setDraggedSectionId(null)
     setDraggedBlock(null)
@@ -1205,7 +1262,7 @@ function App() {
 
     updateEditorDocument((current) => {
       if (isPaletteDraggedBlock(draggedBlock)) {
-        const nextBlock = createDefaultBlock(draggedBlock.blockType)
+        const nextBlock = applyBrandToBlock(createDefaultBlock(draggedBlock.blockType), brandLibrary)
         insertedBlockId = nextBlock.id
 
         return {
@@ -1554,6 +1611,30 @@ function App() {
     }
   }
 
+  function handleApplyBrandLibrary() {
+    if (!draft?.editorDocument) return
+
+    if (isBrandLibraryEmpty(brandLibrary)) {
+      setInfoMessage('No brand library configured for this tenant.')
+      return
+    }
+
+    setDraft((prev) => {
+      if (!prev?.editorDocument) return prev
+      return { ...prev, editorDocument: applyBrandLibrary(prev.editorDocument, brandLibrary) }
+    })
+  }
+
+  function isBrandLibraryEmpty(lib: import('./lib/api').BrandLibraryDto) {
+    if (!lib) return true
+    const hasColors = Array.isArray(lib.colors) && lib.colors.length > 0
+    const hasHeadings = Array.isArray(lib.headingStyles) && lib.headingStyles.length > 0
+    const hasText = Array.isArray(lib.textStyles) && lib.textStyles.length > 0
+    const hasButton = !!lib.buttonStyle
+    const hasSectionBg = !!lib.sectionDefaultBackgroundColor
+    return !(hasColors || hasHeadings || hasText || hasButton || hasSectionBg)
+  }
+
   async function handleSaveTemplate() {
     if (!tenantId || !selectedTemplate || !draft || !hasUnsavedChanges) {
       return
@@ -1685,6 +1766,17 @@ function App() {
     }
   }
 
+  if (!isAuthLoading && currentUser && isBrandLibraryRoute) {
+    return (
+      <BrandLibraryPage
+        key={tenantId ?? 'no-tenant'}
+        library={brandLibrary}
+        onSave={handleSaveBrandLibrary}
+        onBack={() => navigateToRoute(brandLibraryReturnRoute)}
+      />
+    )
+  }
+
   if (!isAuthLoading && currentUser && isEditorRoute) {
     return (
       <div className="min-h-screen bg-slate-950 text-slate-100 xl:h-screen xl:overflow-hidden">
@@ -1710,6 +1802,22 @@ function App() {
               </div>
 
               <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={navigateToBrandLibrary}
+                  className="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/5"
+                >
+                  Brand Library
+                </button>
+                <button
+                  type="button"
+                  onClick={handleApplyBrandLibrary}
+                  disabled={!draft?.editorDocument || isBrandLibraryEmpty(brandLibrary)}
+                  title={isBrandLibraryEmpty(brandLibrary) ? 'No brand library configured' : 'Apply brand colours, fonts and button style to all matching blocks'}
+                  className="rounded-xl border border-purple-400/30 bg-purple-500/10 px-4 py-2 text-sm font-medium text-purple-100 transition hover:border-purple-300/50 hover:bg-purple-500/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-slate-800 disabled:text-slate-500"
+                >
+                  Apply Brand
+                </button>
                 <button
                   type="button"
                   onClick={() => void handleOpenPreviewModal()}
@@ -1780,6 +1888,7 @@ function App() {
                     handleSelectBlock={handleSelectBlock}
                     handleStartBuilder={handleStartBuilder}
                     clearDragState={clearDragState}
+                    brandColors={brandLibrary.colors}
                   />
                 </div>
 

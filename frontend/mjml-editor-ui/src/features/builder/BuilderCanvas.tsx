@@ -1,9 +1,9 @@
 import type { EditorBlock } from '../../lib/api'
+import DOMPurify from 'dompurify'
 import {
   type BuilderPreset,
   type DraggedBlock,
   type TemplateDraft,
-  getBlockActionPlacement,
   getBlockFrameStyle,
   getBlockLayout,
   getBlockTextStyle,
@@ -74,6 +74,19 @@ function InlineCanvasInput({
       className={sharedClassName}
     />
   )
+}
+
+const BLOCK_PURIFY_CONFIG = {
+  ALLOWED_TAGS: ['strong', 'em', 'u', 'a', 'br', 'p'],
+  ALLOWED_ATTR: ['href', 'target', 'rel', 'style'],
+}
+const INLINE_PURIFY_CONFIG = {
+  ALLOWED_TAGS: ['strong', 'em', 'u', 'a'],
+  ALLOWED_ATTR: ['href', 'target', 'rel', 'style'],
+}
+
+function safeHtml(html: string | null | undefined, inline = false): string {
+  return DOMPurify.sanitize(html ?? '', inline ? INLINE_PURIFY_CONFIG : BLOCK_PURIFY_CONFIG) as string
 }
 
 type BuilderCanvasProps = {
@@ -482,37 +495,16 @@ function CanvasBlockPreview({
     ? `${Math.round(552 * (block.widthPercentage / 100))}px`
     : undefined
   const layout = getBlockLayout(block)
-  const actionPlacement = getBlockActionPlacement(block)
-
-  function renderActionChip(inverse = false) {
-    if (!block.actionLabel && !block.actionUrl) {
-      return null
-    }
-
-    return (
-      <div className="flex" style={{ justifyContent: toFlexJustify(block.alignment) }}>
-        <span
-          className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${inverse ? 'bg-white text-slate-950' : 'bg-slate-900 text-white'}`}
-        >
-          {block.actionLabel || 'Learn more'}
-        </span>
-      </div>
-    )
-  }
 
   if (block.type === 'Hero') {
     return (
       <div style={frameStyle} className="rounded-2xl px-1 py-1">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Heading</p>
-        {isSelected ? (
-          <div className="mt-3">
-            <InlineCanvasInput value={block.textContent ?? ''} placeholder="Heading" onChange={(value) => onUpdateBlock({ textContent: value })} />
-          </div>
-        ) : (
-          <p className="mt-2" style={getBlockTextStyle(block, { color: '#1f2937', fontSize: 24, fontWeight: '700' })}>
-            {block.textContent}
-          </p>
-        )}
+        <div
+          className="mt-2"
+          style={getBlockTextStyle(block, { color: '#1f2937', fontSize: 24, fontWeight: '700' })}
+          dangerouslySetInnerHTML={{ __html: safeHtml(block.textContent) }}
+        />
       </div>
     )
   }
@@ -521,15 +513,11 @@ function CanvasBlockPreview({
     return (
       <div style={frameStyle} className="rounded-2xl px-1 py-1">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Paragraph</p>
-        {isSelected ? (
-          <div className="mt-3">
-            <InlineCanvasInput multiline value={block.textContent ?? ''} placeholder="Paragraph copy" onChange={(value) => onUpdateBlock({ textContent: value })} />
-          </div>
-        ) : (
-          <p className="mt-2" style={getBlockTextStyle(block, { color: '#475569', fontSize: 16 })}>
-            {block.textContent}
-          </p>
-        )}
+        <div
+          className="mt-2"
+          style={getBlockTextStyle(block, { color: '#475569', fontSize: 16 })}
+          dangerouslySetInnerHTML={{ __html: safeHtml(block.textContent) }}
+        />
       </div>
     )
   }
@@ -578,195 +566,6 @@ function CanvasBlockPreview({
     )
   }
 
-  if (block.type === 'PropertyCard') {
-    const action = renderActionChip()
-    const details = (
-      <div className="min-w-0 flex-1">
-        {actionPlacement === 'BeforeContent' && action && <div className="mb-4">{action}</div>}
-        {isSelected ? (
-          <div className="space-y-3">
-            <InlineCanvasInput value={block.textContent ?? ''} placeholder="Property title" onChange={(value) => onUpdateBlock({ textContent: value })} />
-            <InlineCanvasInput value={block.secondaryText ?? ''} placeholder="Property details" onChange={(value) => onUpdateBlock({ secondaryText: value })} />
-            <InlineCanvasInput value={block.actionLabel ?? ''} placeholder="Button label" onChange={(value) => onUpdateBlock({ actionLabel: value })} />
-          </div>
-        ) : (
-          <>
-            <p style={getBlockTextStyle(block, { color: '#0f172a', fontSize: 20, fontWeight: '700' })}>
-              {block.textContent || 'Property title'}
-            </p>
-            {block.secondaryText && (
-              <p className="mt-2 text-sm text-slate-500">{block.secondaryText}</p>
-            )}
-          </>
-        )}
-        {actionPlacement === 'AfterContent' && action && <div className="mt-4">{action}</div>}
-      </div>
-    )
-    const media = (
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-        {block.imageUrl ? (
-          <img
-            src={block.imageUrl}
-            alt={block.altText ?? 'Featured property'}
-            className={layout === 'Vertical' ? 'h-40 w-full object-cover' : 'h-full min-h-48 w-full object-cover'}
-          />
-        ) : (
-          <div className="flex h-40 items-center justify-center text-sm text-slate-500">No property image</div>
-        )}
-      </div>
-    )
-
-    return (
-      <div
-        className="overflow-hidden rounded-3xl"
-        style={{
-          backgroundColor: block.backgroundColor ?? '#ffffff',
-          borderColor: block.borderColor ?? '#dbe4f0',
-          borderWidth: block.borderWidth ?? 1,
-          borderStyle: 'solid',
-          borderRadius: block.borderRadius ?? 20,
-        }}
-      >
-        <p className="px-5 pt-5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Property card</p>
-        <div className={`px-5 pb-5 pt-3 ${layout === 'Vertical' ? 'space-y-4' : 'grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-4'}`}>
-          {layout === 'HorizontalReverse'
-            ? <>{details}{media}</>
-            : layout === 'Horizontal'
-              ? <>{media}{details}</>
-              : <><div>{media}</div>{details}</>}
-        </div>
-      </div>
-    )
-  }
-
-  if (block.type === 'FeatureCard') {
-    return (
-      <div
-        className="rounded-3xl px-5 py-5"
-        style={{
-          backgroundColor: block.backgroundColor ?? '#eff6ff',
-          borderColor: block.borderColor ?? '#bfdbfe',
-          borderWidth: block.borderWidth ?? 1,
-          borderStyle: 'solid',
-          borderRadius: block.borderRadius ?? 18,
-        }}
-      >
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Feature card</p>
-        {isSelected ? (
-          <div className="mt-3 space-y-3">
-            <InlineCanvasInput value={block.textContent ?? ''} placeholder="Feature title" onChange={(value) => onUpdateBlock({ textContent: value })} />
-            <InlineCanvasInput value={block.secondaryText ?? ''} placeholder="Feature detail" onChange={(value) => onUpdateBlock({ secondaryText: value })} />
-          </div>
-        ) : layout === 'Vertical' ? (
-          <>
-            <p className="mt-3" style={getBlockTextStyle(block, { color: '#1d4ed8', fontSize: 18, fontWeight: '700' })}>
-              {block.textContent || 'Feature title'}
-            </p>
-            {block.secondaryText && <p className="mt-2 text-sm text-slate-600">{block.secondaryText}</p>}
-          </>
-        ) : (
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            {layout === 'HorizontalReverse'
-              ? <><p className="text-sm text-slate-600">{block.secondaryText}</p><p style={getBlockTextStyle(block, { color: '#1d4ed8', fontSize: 18, fontWeight: '700' })}>{block.textContent || 'Feature title'}</p></>
-              : <><p style={getBlockTextStyle(block, { color: '#1d4ed8', fontSize: 18, fontWeight: '700' })}>{block.textContent || 'Feature title'}</p><p className="text-sm text-slate-600">{block.secondaryText}</p></>}
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  if (block.type === 'IconText') {
-    const media = (
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-        {block.imageUrl ? (
-          <img src={block.imageUrl} alt={block.altText ?? 'Feature icon'} className="h-full w-full object-cover" />
-        ) : (
-          <span className="text-xs text-slate-500">Icon</span>
-        )}
-      </div>
-    )
-    const content = (
-      <div className="min-w-0 flex-1">
-        {isSelected ? (
-          <div className="space-y-3">
-            <InlineCanvasInput value={block.textContent ?? ''} placeholder="Amenity title" onChange={(value) => onUpdateBlock({ textContent: value })} />
-            <InlineCanvasInput multiline value={block.secondaryText ?? ''} placeholder="Amenity detail" onChange={(value) => onUpdateBlock({ secondaryText: value })} />
-          </div>
-        ) : (
-          <>
-            <p style={getBlockTextStyle(block, { color: '#0f172a', fontSize: 16, fontWeight: '700' })}>
-              {block.textContent || 'Amenity title'}
-            </p>
-            {block.secondaryText && <p className="mt-1 text-sm text-slate-500">{block.secondaryText}</p>}
-          </>
-        )}
-      </div>
-    )
-
-    return (
-      <div style={frameStyle} className="rounded-2xl px-1 py-1">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Icon + text</p>
-        <div className={`mt-3 ${layout === 'Vertical' ? 'space-y-3' : 'flex items-start gap-4'}`}>
-          {layout === 'HorizontalReverse'
-            ? <>{content}{media}</>
-            : layout === 'Horizontal'
-              ? <>{media}{content}</>
-              : <><div>{media}</div>{content}</>}
-        </div>
-      </div>
-    )
-  }
-
-  if (block.type === 'PromoBanner') {
-    const action = renderActionChip(true)
-    const copy = (
-      <div className="min-w-0 flex-1">
-        {isSelected ? (
-          <div className="space-y-3">
-            <InlineCanvasInput value={block.textContent ?? ''} placeholder="Promotion headline" onChange={(value) => onUpdateBlock({ textContent: value })} />
-            <InlineCanvasInput value={block.secondaryText ?? ''} placeholder="Promotion detail" onChange={(value) => onUpdateBlock({ secondaryText: value })} />
-            <InlineCanvasInput value={block.actionLabel ?? ''} placeholder="CTA label" onChange={(value) => onUpdateBlock({ actionLabel: value })} />
-          </div>
-        ) : (
-          <>
-            <p style={getBlockTextStyle(block, { color: '#ffffff', fontSize: 20, fontWeight: '700' })}>
-              {block.textContent || 'Promotion headline'}
-            </p>
-            {block.secondaryText && <p className="mt-2 text-sm text-slate-300">{block.secondaryText}</p>}
-          </>
-        )}
-      </div>
-    )
-
-    return (
-      <div
-        className="rounded-3xl px-5 py-5"
-        style={{
-          backgroundColor: block.backgroundColor ?? '#0f172a',
-          borderColor: block.borderColor ?? undefined,
-          borderWidth: block.borderWidth ?? undefined,
-          borderStyle: block.borderWidth ? 'solid' : undefined,
-          borderRadius: block.borderRadius ?? 20,
-        }}
-      >
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Promo banner</p>
-        {layout === 'Vertical' ? (
-          <div className="mt-3 space-y-4">
-            {actionPlacement === 'BeforeContent' && action}
-            {copy}
-            {actionPlacement === 'AfterContent' && action}
-          </div>
-        ) : (
-          <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4">
-            {layout === 'HorizontalReverse'
-              ? <>{action}{copy}</>
-              : <>{copy}{action}</>}
-          </div>
-        )}
-      </div>
-    )
-  }
-
   if (block.type === 'Button') {
     // Don't apply frameStyle here — backgroundColor/border are button-specific and must
     // only appear on the button element itself, not the full-width frame container.
@@ -806,27 +605,20 @@ function CanvasBlockPreview({
     return (
       <div style={frameStyle} className="rounded-2xl px-1 py-1">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Badge</p>
-        {isSelected ? (
-          <div className="mt-3">
-            <InlineCanvasInput value={block.textContent ?? ''} placeholder="Badge text" onChange={(value) => onUpdateBlock({ textContent: value })} />
-          </div>
-        ) : (
-          <div className="mt-3 flex" style={{ justifyContent: toFlexJustify(block.alignment) }}>
-            <span
-              className="inline-flex px-3 py-1 text-xs"
-              style={{
-                backgroundColor: block.backgroundColor ?? '#dbeafe',
-                borderRadius: block.borderRadius ?? 999,
-                borderColor: block.borderColor ?? undefined,
-                borderWidth: block.borderWidth ?? undefined,
-                borderStyle: block.borderWidth ? 'solid' : undefined,
-                ...getBlockTextStyle(block, { color: '#1d4ed8', fontSize: 13, fontWeight: '600' }),
-              }}
-            >
-              {block.textContent || 'Badge'}
-            </span>
-          </div>
-        )}
+        <div className="mt-3 flex" style={{ justifyContent: toFlexJustify(block.alignment) }}>
+          <span
+            className="inline-flex px-3 py-1 text-xs"
+            style={{
+              backgroundColor: block.backgroundColor ?? '#dbeafe',
+              borderRadius: block.borderRadius ?? 999,
+              borderColor: block.borderColor ?? undefined,
+              borderWidth: block.borderWidth ?? undefined,
+              borderStyle: block.borderWidth ? 'solid' : undefined,
+              ...getBlockTextStyle(block, { color: '#1d4ed8', fontSize: 13, fontWeight: '600' }),
+            }}
+            dangerouslySetInnerHTML={{ __html: safeHtml(block.textContent, true) || 'Badge' }}
+          />
+        </div>
       </div>
     )
   }
@@ -835,26 +627,20 @@ function CanvasBlockPreview({
     return (
       <div style={frameStyle} className="rounded-2xl px-1 py-1">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Quote</p>
-        {isSelected ? (
-          <div className="mt-3 space-y-3">
-            <InlineCanvasInput multiline value={block.textContent ?? ''} placeholder="Quote" onChange={(value) => onUpdateBlock({ textContent: value })} />
-            <InlineCanvasInput value={block.secondaryText ?? ''} placeholder="Attribution" onChange={(value) => onUpdateBlock({ secondaryText: value })} />
-          </div>
-        ) : (
-          <>
-            <blockquote
-              className="mt-2 border-l-2 border-slate-200 pl-4 italic"
-              style={getBlockTextStyle(block, { color: '#334155', fontSize: 18 })}
-            >
-              “{block.textContent}”
-            </blockquote>
-            {block.secondaryText && <p className="mt-2 text-sm text-slate-500">{block.secondaryText}</p>}
-          </>
+        <blockquote
+          className="mt-2 border-l-2 border-slate-200 pl-4 italic"
+          style={getBlockTextStyle(block, { color: '#334155', fontSize: 18 })}
+          dangerouslySetInnerHTML={{ __html: `"${safeHtml(block.textContent, true)}"` }}
+        />
+        {block.secondaryText && (
+          <p
+            className="mt-2 text-sm text-slate-500"
+            dangerouslySetInnerHTML={{ __html: safeHtml(block.secondaryText, true) }}
+          />
         )}
       </div>
     )
   }
-
   if (block.type === 'LinkList') {
     return (
       <div style={frameStyle} className="rounded-2xl px-1 py-1">
@@ -897,22 +683,22 @@ function CanvasBlockPreview({
     return (
       <div style={frameStyle} className="rounded-2xl px-1 py-1">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Footer / legal</p>
-        {isSelected ? (
-          <div className="mt-3 space-y-3">
-            <InlineCanvasInput multiline value={block.textContent ?? ''} placeholder="Footer copy" onChange={(value) => onUpdateBlock({ textContent: value })} />
-            <InlineCanvasInput value={block.secondaryText ?? ''} placeholder="Secondary line" onChange={(value) => onUpdateBlock({ secondaryText: value })} />
-          </div>
-        ) : (
-          <>
-            <p className="mt-2" style={getBlockTextStyle(block, { color: '#64748b', fontSize: 12 })}>{block.textContent}</p>
-            {block.secondaryText && <p className="mt-1 text-xs text-slate-400">{block.secondaryText}</p>}
-          </>
+        <div
+          className="mt-2"
+          style={getBlockTextStyle(block, { color: '#64748b', fontSize: 12 })}
+          dangerouslySetInnerHTML={{ __html: safeHtml(block.textContent) }}
+        />
+        {block.secondaryText && (
+          <p
+            className="mt-1 text-xs text-slate-400"
+            dangerouslySetInnerHTML={{ __html: safeHtml(block.secondaryText, true) }}
+          />
         )}
       </div>
     )
   }
 
-  if (block.type === 'Spacer') {
+    if (block.type === 'Spacer') {
     return (
       <div>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Spacer</p>

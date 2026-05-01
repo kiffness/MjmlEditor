@@ -31,7 +31,7 @@ public sealed class EmailTemplateMappingsTests
                                 new EmailTemplateEditorBlockDto
                                 {
                                     Id = "property-1",
-                                    Type = EmailTemplateEditorBlockType.PropertyCard,
+                                    Type = EmailTemplateEditorBlockType.Image,
                                     TextContent = "Park-side family home",
                                     SecondaryText = "Guide price {{ params.price }}",
                                     ImageUrl = "https://example.com/property.jpg",

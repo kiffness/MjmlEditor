@@ -58,5 +58,9 @@ public sealed record EmailTemplateEditorBlockDto
 
     public int? WidthPercentage { get; init; }
 
+    public int? BlockPadding { get; init; }
+
+    public EmailTemplateEditorHeadingLevel? HeadingLevel { get; init; }
+
     public IReadOnlyList<EmailTemplateEditorBlockItemDto> Items { get; init; } = [];
 }

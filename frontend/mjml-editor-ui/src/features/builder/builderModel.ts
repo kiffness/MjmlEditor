@@ -12,6 +12,7 @@ import type {
   EditorVerticalAlignment,
   TemplateDto,
   TemplateStatus,
+  BrandLibraryDto,
 } from '../../lib/api'
 
 export type TemplateDraft = {
@@ -53,10 +54,6 @@ export const builderBlockPalette: { type: EditorBlockType; label: string; descri
   { type: 'Text', label: 'Paragraph', description: 'Supporting copy or body text.' },
   { type: 'Image', label: 'Image', description: 'Visual block with image URL and alt text.' },
   { type: 'Logo', label: 'Logo', description: 'Brand logo with optional click-through URL.' },
-  { type: 'PropertyCard', label: 'Property card', description: 'Featured listing card with image, details, and CTA.' },
-  { type: 'FeatureCard', label: 'Feature card', description: 'Highlight a property attribute like bedrooms, price, or EPC.' },
-  { type: 'IconText', label: 'Icon + text', description: 'Small icon-led summary for amenities or local highlights.' },
-  { type: 'PromoBanner', label: 'Promo banner', description: 'High-contrast banner for open days, launches, or price drops.' },
   { type: 'Button', label: 'Button', description: 'Primary call-to-action button.' },
   { type: 'Badge', label: 'Badge', description: 'Small eyebrow or campaign label.' },
   { type: 'Quote', label: 'Quote', description: 'Testimonial or featured customer quote.' },
@@ -84,7 +81,19 @@ export const builderPresetOptions: { id: BuilderPreset; label: string; descripti
   { id: 'three-up-features', label: 'Three-up features', description: 'Three aligned columns for feature highlights.' },
 ]
 
-export const fontFamilyOptions = ['Arial, sans-serif', 'Helvetica, Arial, sans-serif', 'Georgia, serif', 'Tahoma, sans-serif', 'Verdana, sans-serif']
+export const fontFamilyOptions = [
+  'Arial',
+  'Georgia',
+  'Helvetica',
+  'Times New Roman',
+  'Trebuchet MS',
+  'Verdana',
+  'Lato',
+  'Montserrat',
+  'Open Sans',
+  'Playfair Display',
+  'Roboto',
+]
 export const fontWeightOptions = ['400', '500', '600', '700']
 export const textTransformOptions: { value: EditorTextTransform; label: string }[] = [
   { value: 'None', label: 'None' },
@@ -201,6 +210,7 @@ export function getBlockFrameStyle(block: EditorBlock) {
     borderWidth: block.borderWidth ?? undefined,
     borderStyle: block.borderWidth !== null && block.borderWidth !== undefined ? 'solid' : undefined,
     borderRadius: block.borderRadius ?? undefined,
+    padding: block.blockPadding !== null && block.blockPadding !== undefined ? `${block.blockPadding}px` : undefined,
   } as const
 }
 
@@ -225,7 +235,6 @@ export function getBlockLayout(block: EditorBlock): EditorBlockLayout {
 
   switch (block.type) {
     case 'SocialLinks':
-    case 'IconText':
       return 'Horizontal'
     default:
       return 'Vertical'
@@ -260,6 +269,7 @@ export function createDefaultBlock(type: EditorBlockType): EditorBlock {
         fontWeight: '700',
         fontSize: 24,
         lineHeight: 32,
+        headingLevel: 'H1' as const,
       }
     case 'Text':
       return {
@@ -289,74 +299,6 @@ export function createDefaultBlock(type: EditorBlockType): EditorBlock {
         actionUrl: 'https://example.com',
         alignment: 'Left',
         widthPercentage: 45,
-      }
-    case 'PropertyCard':
-      return {
-        id: createId('property'),
-        type,
-        imageUrl: 'https://images.unsplash.com/photo-1568605114967-8130f3a36994?auto=format&fit=crop&w=1200&q=80',
-        altText: 'Featured property exterior',
-        textContent: 'Family home with garden in Balham',
-        secondaryText: 'Guide price {{ params.price }} · 3 bedrooms · 2 bathrooms',
-        actionLabel: 'View property',
-        actionUrl: 'https://example.com/listings/featured-home',
-        backgroundColor: '#ffffff',
-        textColor: '#0f172a',
-        alignment: 'Left',
-        layout: 'Vertical',
-        actionPlacement: 'AfterContent',
-        borderColor: '#dbe4f0',
-        borderWidth: 1,
-        borderRadius: 20,
-      }
-    case 'FeatureCard':
-      return {
-        id: createId('feature-card'),
-        type,
-        textContent: 'Bedrooms',
-        secondaryText: '{{ params.bedrooms }} spacious rooms',
-        backgroundColor: '#eff6ff',
-        textColor: '#1d4ed8',
-        alignment: 'Center',
-        layout: 'Vertical',
-        fontWeight: '700',
-        fontSize: 18,
-        lineHeight: 26,
-        borderColor: '#bfdbfe',
-        borderWidth: 1,
-        borderRadius: 18,
-      }
-    case 'IconText':
-      return {
-        id: createId('icon-text'),
-        type,
-        imageUrl: 'https://dummyimage.com/96x96/e2e8f0/0f172a.png&text=Bed',
-        altText: 'Amenity icon',
-        textContent: 'Private driveway parking',
-        secondaryText: 'Ideal for buyers looking for easy daily access.',
-        textColor: '#334155',
-        alignment: 'Left',
-        layout: 'Horizontal',
-        fontSize: 15,
-        lineHeight: 22,
-      }
-    case 'PromoBanner':
-      return {
-        id: createId('promo-banner'),
-        type,
-        textContent: 'Open house this Saturday',
-        secondaryText: 'Book viewings between 10am and 2pm before slots fill up.',
-        actionLabel: 'Reserve a viewing',
-        actionUrl: 'https://example.com/viewings/open-house',
-        backgroundColor: '#0f172a',
-        textColor: '#ffffff',
-        alignment: 'Left',
-        layout: 'Vertical',
-        actionPlacement: 'AfterContent',
-        fontWeight: '700',
-        fontSize: 20,
-        lineHeight: 28,
-        borderRadius: 20,
       }
     case 'Button':
       return {
@@ -687,4 +629,62 @@ export function toDraft(template: TemplateDto): TemplateDraft {
     mjmlBody: template.mjmlBody,
     editorDocument: cloneEditorDocument(template.editorDocument ?? null),
   }
+}
+
+/** Applies brand library styles to every matching block and section in the document. */
+export function applyBrandLibrary(doc: EditorDocument, brand: BrandLibraryDto): EditorDocument {
+  return {
+    ...doc,
+    sections: doc.sections.map((section) => ({
+      ...section,
+      backgroundColor: brand.sectionDefaultBackgroundColor ?? section.backgroundColor,
+      columns: section.columns.map((col) => ({
+        ...col,
+        blocks: col.blocks.map((block) => applyBrandToBlock(block, brand)),
+      })),
+    })),
+  }
+}
+
+export function applyBrandToBlock(block: EditorBlock, brand: BrandLibraryDto): EditorBlock {
+  if (block.type === 'Hero') {
+    const level = block.headingLevel ?? 'H1'
+    const style = brand.headingStyles.find((h) => h.level === level)
+    if (!style) return block
+    return {
+      ...block,
+      fontFamily: style.fontFamily ?? block.fontFamily,
+      fontSize: style.fontSize ?? block.fontSize,
+      fontWeight: style.fontWeight ?? block.fontWeight,
+      textColor: style.color ?? block.textColor,
+    }
+  }
+
+  if (block.type === 'Text') {
+    const style = brand.textStyles.find((t) => t.name === 'Paragraph')
+    if (!style) return block
+    return {
+      ...block,
+      fontFamily: style.fontFamily ?? block.fontFamily,
+      fontSize: style.fontSize ?? block.fontSize,
+      fontWeight: style.fontWeight ?? block.fontWeight,
+      textColor: style.color ?? block.textColor,
+    }
+  }
+
+  if (block.type === 'Button') {
+    const btn = brand.buttonStyle
+    if (!btn) return block
+    return {
+      ...block,
+      backgroundColor: btn.backgroundColor ?? block.backgroundColor,
+      textColor: btn.textColor ?? block.textColor,
+      borderRadius: btn.borderRadius ?? block.borderRadius,
+      fontFamily: btn.fontFamily ?? block.fontFamily,
+      fontSize: btn.fontSize ?? block.fontSize,
+      fontWeight: btn.fontWeight ?? block.fontWeight,
+    }
+  }
+
+  return block
 }

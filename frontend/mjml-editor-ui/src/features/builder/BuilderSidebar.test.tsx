@@ -43,6 +43,7 @@ function createProps(overrides?: Partial<ComponentProps<typeof BuilderSidebar>>)
     handleSelectBlock: vi.fn(),
     handleStartBuilder: vi.fn(),
     clearDragState: vi.fn(),
+    brandColors: [],
     ...overrides,
   }
 }

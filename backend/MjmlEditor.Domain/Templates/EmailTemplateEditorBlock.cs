@@ -56,6 +56,10 @@ public sealed class EmailTemplateEditorBlock
 
     public int? WidthPercentage { get; }
 
+    public int? BlockPadding { get; }
+
+    public EmailTemplateEditorHeadingLevel? HeadingLevel { get; }
+
     public IReadOnlyList<EmailTemplateEditorBlockItem> Items { get; }
 
     public static EmailTemplateEditorBlock Create(
@@ -86,6 +90,8 @@ public sealed class EmailTemplateEditorBlock
         int? borderWidth,
         int? borderRadius,
         int? widthPercentage,
+        int? blockPadding,
+        EmailTemplateEditorHeadingLevel? headingLevel,
         IReadOnlyList<EmailTemplateEditorBlockItem>? items)
     {
         ValidateType(type);
@@ -102,6 +108,12 @@ public sealed class EmailTemplateEditorBlock
         ValidateOptionalNonNegative(borderWidth, nameof(borderWidth));
         ValidateOptionalNonNegative(borderRadius, nameof(borderRadius));
         ValidateOptionalRange(widthPercentage, nameof(widthPercentage), 1, 100);
+        ValidateOptionalNonNegative(blockPadding, nameof(blockPadding));
+
+        if (headingLevel is not null && !Enum.IsDefined(headingLevel.Value))
+        {
+            throw new ArgumentOutOfRangeException(nameof(headingLevel), headingLevel.Value, "Unsupported heading level.");
+        }
 
         var normalizedTextContent = NormalizeOptional(textContent);
         var normalizedSecondaryText = NormalizeOptional(secondaryText);
@@ -154,6 +166,8 @@ public sealed class EmailTemplateEditorBlock
             borderWidth,
             borderRadius,
             widthPercentage,
+            blockPadding,
+            headingLevel,
             normalizedItems);
     }
 
@@ -185,6 +199,8 @@ public sealed class EmailTemplateEditorBlock
         int? borderWidth,
         int? borderRadius,
         int? widthPercentage,
+        int? blockPadding,
+        EmailTemplateEditorHeadingLevel? headingLevel,
         IReadOnlyList<EmailTemplateEditorBlockItem>? items)
     {
         return Create(
@@ -215,6 +231,8 @@ public sealed class EmailTemplateEditorBlock
             borderWidth,
             borderRadius,
             widthPercentage,
+            blockPadding,
+            headingLevel,
             items);
     }
 
@@ -248,6 +266,8 @@ public sealed class EmailTemplateEditorBlock
             BorderWidth,
             BorderRadius,
             WidthPercentage,
+            BlockPadding,
+            HeadingLevel,
             Items.Select(item => item.Clone()).ToArray());
     }
 
@@ -279,6 +299,8 @@ public sealed class EmailTemplateEditorBlock
         int? borderWidth,
         int? borderRadius,
         int? widthPercentage,
+        int? blockPadding,
+        EmailTemplateEditorHeadingLevel? headingLevel,
         IReadOnlyList<EmailTemplateEditorBlockItem> items)
     {
         Id = id;
@@ -308,6 +330,8 @@ public sealed class EmailTemplateEditorBlock
         BorderWidth = borderWidth;
         BorderRadius = borderRadius;
         WidthPercentage = widthPercentage;
+        BlockPadding = blockPadding;
+        HeadingLevel = headingLevel;
         Items = items;
     }
 
@@ -399,25 +423,9 @@ public sealed class EmailTemplateEditorBlock
             case EmailTemplateEditorBlockType.Footer:
             case EmailTemplateEditorBlockType.Badge:
             case EmailTemplateEditorBlockType.Quote:
-            case EmailTemplateEditorBlockType.FeatureCard:
-            case EmailTemplateEditorBlockType.PromoBanner:
                 if (string.IsNullOrWhiteSpace(textContent))
                 {
                     throw new ArgumentException("TextContent is required for this block type.", nameof(textContent));
-                }
-
-                break;
-
-            case EmailTemplateEditorBlockType.PropertyCard:
-            case EmailTemplateEditorBlockType.IconText:
-                if (string.IsNullOrWhiteSpace(textContent))
-                {
-                    throw new ArgumentException("TextContent is required for this block type.", nameof(textContent));
-                }
-
-                if (string.IsNullOrWhiteSpace(imageUrl))
-                {
-                    throw new ArgumentException("ImageUrl is required for this block type.", nameof(imageUrl));
                 }
 
                 break;

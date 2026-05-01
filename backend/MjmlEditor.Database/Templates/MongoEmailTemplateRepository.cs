@@ -169,10 +169,13 @@ internal sealed class MongoEmailTemplateRepository : IEmailTemplateRepository
                     column.Id,
                     column.WidthPercentage,
                     column.BackgroundColor,
+                    column.Padding,
                     column.VerticalAlignment,
-                    column.Blocks.Select(block => EmailTemplateEditorBlock.Restore(
+                    column.Blocks
+                        .Where(block => Enum.TryParse<EmailTemplateEditorBlockType>(block.Type, out _))
+                        .Select(block => EmailTemplateEditorBlock.Restore(
                         block.Id,
-                        block.Type,
+                        Enum.Parse<EmailTemplateEditorBlockType>(block.Type),
                         block.TextContent,
                         block.SecondaryText,
                         block.ImageUrl,
@@ -198,6 +201,8 @@ internal sealed class MongoEmailTemplateRepository : IEmailTemplateRepository
                         block.BorderWidth,
                         block.BorderRadius,
                         block.WidthPercentage,
+                        block.BlockPadding,
+                        block.HeadingLevel,
                         block.Items?.Select(item => EmailTemplateEditorBlockItem.Restore(
                             item.Id,
                             item.Label,
@@ -219,11 +224,12 @@ internal sealed class MongoEmailTemplateRepository : IEmailTemplateRepository
                     Id = column.Id,
                     WidthPercentage = column.WidthPercentage,
                     BackgroundColor = column.BackgroundColor,
+                    Padding = column.Padding,
                     VerticalAlignment = column.VerticalAlignment,
                     Blocks = column.Blocks.Select(block => new EmailTemplateEditorBlockDocument
                     {
                         Id = block.Id,
-                        Type = block.Type,
+                        Type = block.Type.ToString(),
                         TextContent = block.TextContent,
                         SecondaryText = block.SecondaryText,
                         ImageUrl = block.ImageUrl,
@@ -249,6 +255,8 @@ internal sealed class MongoEmailTemplateRepository : IEmailTemplateRepository
                         BorderWidth = block.BorderWidth,
                         BorderRadius = block.BorderRadius,
                         WidthPercentage = block.WidthPercentage,
+                        BlockPadding = block.BlockPadding,
+                        HeadingLevel = block.HeadingLevel,
                         Items = block.Items.Select(item => new EmailTemplateEditorBlockItemDocument
                         {
                             Id = item.Id,

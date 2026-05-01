@@ -14,8 +14,4 @@ public enum EmailTemplateEditorBlockType
     LinkList = 10,
     Badge = 11,
     Quote = 12,
-    PropertyCard = 13,
-    FeatureCard = 14,
-    IconText = 15,
-    PromoBanner = 16
 }

@@ -33,5 +33,6 @@ app.MapGet("/health", () => TypedResults.Ok(new { status = "ok" }))
 app.MapAuthEndpoints();
 app.MapTenantEndpoints();
 app.MapEmailTemplateEndpoints();
+app.MapBrandLibraryEndpoints();
 
 app.Run();

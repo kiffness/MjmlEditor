@@ -58,10 +58,6 @@ export type EditorBlockType =
   | 'LinkList'
   | 'Badge'
   | 'Quote'
-  | 'PropertyCard'
-  | 'FeatureCard'
-  | 'IconText'
-  | 'PromoBanner'
 
 export type EditorBlockItem = {
   id: string
@@ -97,6 +93,8 @@ export type EditorBlock = {
   borderWidth?: number | null
   borderRadius?: number | null
   widthPercentage?: number | null
+  blockPadding?: number | null
+  headingLevel?: 'H1' | 'H2' | 'H3' | null
   items?: EditorBlockItem[] | null
 }
 
@@ -104,6 +102,7 @@ export type EditorColumn = {
   id: string
   widthPercentage: number
   backgroundColor?: string | null
+  padding?: number | null
   verticalAlignment?: EditorVerticalAlignment | null
   blocks: EditorBlock[]
 }
@@ -173,6 +172,52 @@ export type RenderMjmlRequest = {
 
 export type UpdateTemplateRequest = CreateTemplateRequest & {
   status: TemplateStatus
+}
+
+export type BrandColorDto = {
+  name: string
+  value: string
+}
+
+export type BrandHeadingStyleDto = {
+  level: string
+  fontFamily?: string | null
+  fontSize?: number | null
+  fontWeight?: string | null
+  color?: string | null
+}
+
+export type BrandTextStyleDto = {
+  name: string
+  fontFamily?: string | null
+  fontSize?: number | null
+  fontWeight?: string | null
+  color?: string | null
+}
+
+export type BrandButtonStyleDto = {
+  backgroundColor?: string | null
+  textColor?: string | null
+  borderRadius?: number | null
+  fontFamily?: string | null
+  fontSize?: number | null
+  fontWeight?: string | null
+}
+
+export type BrandLibraryDto = {
+  sectionDefaultBackgroundColor?: string | null
+  colors: BrandColorDto[]
+  headingStyles: BrandHeadingStyleDto[]
+  textStyles: BrandTextStyleDto[]
+  buttonStyle?: BrandButtonStyleDto | null
+}
+
+export const defaultBrandLibrary: BrandLibraryDto = {
+  sectionDefaultBackgroundColor: null,
+  colors: [],
+  headingStyles: [],
+  textStyles: [],
+  buttonStyle: null,
 }
 
 type ProblemDetails = {
@@ -345,6 +390,21 @@ export function deleteTemplate(tenantId: string, templateId: string) {
     `/api/templates/${templateId}`,
     {
       method: 'DELETE',
+    },
+    tenantId
+  )
+}
+
+export function getBrandLibrary(tenantId: string) {
+  return request<BrandLibraryDto>('/api/brand-library', undefined, tenantId)
+}
+
+export function saveBrandLibrary(tenantId: string, payload: BrandLibraryDto) {
+  return request<BrandLibraryDto>(
+    '/api/brand-library',
+    {
+      method: 'PUT',
+      body: JSON.stringify(payload),
     },
     tenantId
   )

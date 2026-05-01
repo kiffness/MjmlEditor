@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Ganss.Xss;
 using MjmlEditor.Domain.Templates;
 
 namespace MjmlEditor.Application.Templates;
@@ -43,6 +44,11 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
                     builder.Append($" background-color=\"{EncodeAttribute(column.BackgroundColor)}\"");
                 }
 
+                if (column.Padding is not null)
+                {
+                    builder.Append($" padding=\"{column.Padding.Value}px\"");
+                }
+
                 if (column.VerticalAlignment is not null)
                 {
                     builder.Append($" vertical-align=\"{ToMjmlVerticalAlignment(column.VerticalAlignment.Value)}\"");
@@ -83,10 +89,6 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
             EmailTemplateEditorBlockType.LinkList => RenderLinksBlock(block, inlineByDefault: false, defaultAlignment: EmailTemplateEditorAlignment.Left),
             EmailTemplateEditorBlockType.Badge => RenderBadgeBlock(block),
             EmailTemplateEditorBlockType.Quote => RenderQuoteBlock(block),
-            EmailTemplateEditorBlockType.PropertyCard => RenderPropertyCardBlock(block),
-            EmailTemplateEditorBlockType.FeatureCard => RenderFeatureCardBlock(block),
-            EmailTemplateEditorBlockType.IconText => RenderIconTextBlock(block),
-            EmailTemplateEditorBlockType.PromoBanner => RenderPromoBannerBlock(block),
             _ => throw new ArgumentOutOfRangeException(nameof(block), block.Type, "Unsupported editor block type.")
         };
     }
@@ -102,9 +104,10 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
             block.TextColor ?? (isHero ? "#1f2937" : "#4b5563"),
             isHero ? "700" : null);
         AppendBoxAttributes(builder, block);
+        AppendPaddingAttribute(builder, block);
 
         builder.Append(">");
-        builder.Append(EncodeText(block.TextContent ?? string.Empty));
+        builder.Append(SanitizeBlock(block.TextContent));
         builder.Append("</mj-text>");
         return builder.ToString();
     }
@@ -123,6 +126,7 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
         builder.Append($" align=\"{ToMjmlAlignment(block.Alignment)}\"");
         AppendWidthAttribute(builder, block.WidthPercentage);
         AppendBoxAttributes(builder, block);
+        AppendPaddingAttribute(builder, block);
         builder.Append(" />");
         return builder.ToString();
     }
@@ -145,7 +149,7 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
         }
 
         builder.Append($" align=\"{ToMjmlAlignment(block.Alignment ?? EmailTemplateEditorAlignment.Left)}\"");
-        builder.Append(" padding=\"0\"");
+        builder.Append($" padding=\"{block.BlockPadding?.ToString() ?? "0"}px\"");
         AppendBoxAttributes(builder, block);
         builder.Append(" />");
         return builder.ToString();
@@ -166,6 +170,7 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
             builder.Append($" border-radius=\"{block.BorderRadius.Value}px\"");
         }
         AppendWidthAttribute(builder, block.WidthPercentage);
+        AppendPaddingAttribute(builder, block);
         builder.Append(">");
         builder.Append(EncodeText(block.ActionLabel ?? string.Empty));
         builder.Append("</mj-button>");
@@ -184,6 +189,7 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
         builder.Append($" border-color=\"{EncodeAttribute(block.DividerColor ?? "#d1d5db")}\"");
         builder.Append($" border-width=\"{block.DividerThickness ?? 1}px\"");
         AppendWidthAttribute(builder, block.WidthPercentage);
+        AppendPaddingAttribute(builder, block);
         builder.Append(" />");
         return builder.ToString();
     }
@@ -198,8 +204,9 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
         builder.Append("        <mj-text");
         AppendTextStyleAttributes(builder, block, fontSize, block.TextColor ?? "#64748b", null, includeAlignment: false);
         AppendBoxAttributes(builder, block);
+        AppendPaddingAttribute(builder, block);
         builder.Append($" align=\"{alignment}\"");
-        builder.Append($">{EncodeText(block.TextContent ?? string.Empty)}</mj-text>");
+        builder.Append($">{SanitizeBlock(block.TextContent)}</mj-text>");
         builder.AppendLine();
 
         if (!string.IsNullOrWhiteSpace(block.SecondaryText))
@@ -213,7 +220,7 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
                 builder.Append($" font-family=\"{EncodeAttribute(block.FontFamily)}\"");
             }
 
-            builder.Append($">{EncodeText(block.SecondaryText)}</mj-text>");
+            builder.Append($">{SanitizeInline(block.SecondaryText)}</mj-text>");
         }
 
         return builder.ToString().TrimEnd();
@@ -231,9 +238,9 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
         var letterSpacing = block.LetterSpacing is not null ? $"letter-spacing:{block.LetterSpacing.Value}px;" : string.Empty;
         var textTransform = block.TextTransform is not null ? $"text-transform:{ToCssTextTransform(block.TextTransform.Value)};" : string.Empty;
         var textDecoration = block.TextDecoration is not null ? $"text-decoration:{ToCssTextDecoration(block.TextDecoration.Value)};" : string.Empty;
-        var content = $"<span style=\"display:inline-block;background-color:{backgroundColor};color:{textColor};padding:4px 12px;border-radius:{borderRadius}px;font-size:{fontSize}px;font-weight:{EncodeAttribute(block.FontWeight ?? "600")};line-height:{FormatCssLineHeight(block.LineHeight)};{letterSpacing}{textTransform}{textDecoration}border:{borderWidth}px solid {EncodeAttribute(borderColor)};\">{EncodeText(block.TextContent ?? string.Empty)}</span>";
-
-        return $"        <mj-text align=\"{alignment}\">{content}</mj-text>";
+        var content = $"<span style=\"display:inline-block;background-color:{backgroundColor};color:{textColor};padding:4px 12px;border-radius:{borderRadius}px;font-size:{fontSize}px;font-weight:{EncodeAttribute(block.FontWeight ?? "600")};line-height:{FormatCssLineHeight(block.LineHeight)};{letterSpacing}{textTransform}{textDecoration}border:{borderWidth}px solid {EncodeAttribute(borderColor)};\">{SanitizeInline(block.TextContent)}</span>";
+        var paddingAttr = block.BlockPadding is not null ? $" padding=\"{block.BlockPadding.Value}px\"" : string.Empty;
+        return $"        <mj-text align=\"{alignment}\"{paddingAttr}>{content}</mj-text>";
     }
 
     private static string RenderQuoteBlock(EmailTemplateEditorBlock block)
@@ -247,186 +254,22 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
         AppendTextStyleAttributes(builder, block, fontSize, block.TextColor ?? "#334155", null, includeAlignment: false);
         builder.Append(" font-style=\"italic\"");
         AppendBoxAttributes(builder, block);
+        AppendPaddingAttribute(builder, block);
         builder.Append($" align=\"{alignment}\"");
         builder.Append(">&ldquo;");
-        builder.Append(EncodeText(block.TextContent ?? string.Empty));
+        builder.Append(SanitizeInline(block.TextContent));
         builder.Append("&rdquo;</mj-text>");
         builder.AppendLine();
 
         if (!string.IsNullOrWhiteSpace(block.SecondaryText))
         {
             builder.Append(
-                $"        <mj-text font-size=\"14px\" color=\"#64748b\" align=\"{alignment}\">{EncodeText(block.SecondaryText)}</mj-text>");
+                $"        <mj-text font-size=\"14px\" color=\"#64748b\" align=\"{alignment}\">{SanitizeInline(block.SecondaryText)}</mj-text>");
         }
 
         return builder.ToString().TrimEnd();
     }
 
-    private static string RenderPropertyCardBlock(EmailTemplateEditorBlock block)
-    {
-        var layout = GetBlockLayout(block, EmailTemplateEditorBlockLayout.Vertical);
-        var actionPlacement = GetActionPlacement(block);
-        var actionHtml = BuildOptionalHtmlButton(block, "#0f172a", "#ffffff");
-        var detailsBuilder = new StringBuilder();
-        detailsBuilder.Append($"<div style=\"{BuildTextStyle(block, 22, "#0f172a", "700", includeAlignment: false)}\">{EncodeText(block.TextContent ?? string.Empty)}</div>");
-
-        if (actionPlacement == EmailTemplateEditorBlockActionPlacement.BeforeContent && actionHtml.Length > 0)
-        {
-            detailsBuilder.Append($"<div style=\"margin-top:16px;text-align:{ToCssTextAlign(block.Alignment)};\">{actionHtml}</div>");
-        }
-
-        if (!string.IsNullOrWhiteSpace(block.SecondaryText))
-        {
-            detailsBuilder.Append($"<div style=\"margin-top:8px;color:#475569;font-size:14px;line-height:22px;\">{EncodeText(block.SecondaryText)}</div>");
-        }
-
-        if (actionPlacement == EmailTemplateEditorBlockActionPlacement.AfterContent && actionHtml.Length > 0)
-        {
-            detailsBuilder.Append($"<div style=\"margin-top:16px;text-align:{ToCssTextAlign(block.Alignment)};\">{actionHtml}</div>");
-        }
-
-        var imageCell = $"<td style=\"{(layout == EmailTemplateEditorBlockLayout.Vertical ? string.Empty : "width:50%;")}vertical-align:top;padding:0;\"><img src=\"{EncodeAttribute(block.ImageUrl ?? string.Empty)}\" alt=\"{EncodeAttribute(block.AltText ?? "Featured property")}\" style=\"display:block;width:100%;height:auto;border:0;\" /></td>";
-        var detailCell = $"<td style=\"vertical-align:top;padding:20px;\">{detailsBuilder}</td>";
-        var builder = new StringBuilder();
-        // These composed blocks use nested tables because they need stable internal layout control across email clients.
-        builder.Append("        <mj-table padding=\"0\">");
-        builder.Append("<tr><td style=\"");
-        builder.Append(BuildCardContainerStyle(block, "#ffffff", "#dbe4f0", 1, 20));
-        builder.Append("\">");
-        builder.Append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\">");
-
-        if (layout == EmailTemplateEditorBlockLayout.Vertical)
-        {
-            builder.Append($"<tr>{imageCell}</tr><tr>{detailCell}</tr>");
-        }
-        else if (layout == EmailTemplateEditorBlockLayout.HorizontalReverse)
-        {
-            builder.Append($"<tr>{detailCell}{imageCell}</tr>");
-        }
-        else
-        {
-            builder.Append($"<tr>{imageCell}{detailCell}</tr>");
-        }
-
-        builder.Append("</table></td></tr></mj-table>");
-        return builder.ToString();
-    }
-
-    private static string RenderFeatureCardBlock(EmailTemplateEditorBlock block)
-    {
-        var layout = GetBlockLayout(block, EmailTemplateEditorBlockLayout.Vertical);
-        var builder = new StringBuilder();
-        builder.Append("        <mj-table padding=\"0\">");
-        builder.Append("<tr><td style=\"");
-        builder.Append(BuildCardContainerStyle(block, "#eff6ff", "#bfdbfe", 1, 18));
-        builder.Append("padding:20px;\">");
-        if (layout == EmailTemplateEditorBlockLayout.Vertical)
-        {
-            builder.Append($"<div style=\"{BuildTextStyle(block, 18, "#1d4ed8", "700")}\">{EncodeText(block.TextContent ?? string.Empty)}</div>");
-
-            if (!string.IsNullOrWhiteSpace(block.SecondaryText))
-            {
-                builder.Append($"<div style=\"margin-top:8px;color:#334155;font-size:14px;line-height:22px;text-align:{ToCssTextAlign(block.Alignment)};\">{EncodeText(block.SecondaryText)}</div>");
-            }
-        }
-        else
-        {
-            builder.Append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr>");
-            var titleCell = $"<td style=\"vertical-align:top;padding:0 12px 0 0;\"><div style=\"{BuildTextStyle(block, 18, "#1d4ed8", "700", includeAlignment: false)}\">{EncodeText(block.TextContent ?? string.Empty)}</div></td>";
-            var detailCell = $"<td style=\"vertical-align:top;padding:0;\"><div style=\"color:#334155;font-size:14px;line-height:22px;\">{EncodeText(block.SecondaryText ?? string.Empty)}</div></td>";
-            builder.Append(layout == EmailTemplateEditorBlockLayout.HorizontalReverse
-                ? $"{detailCell}{titleCell}"
-                : $"{titleCell}{detailCell}");
-            builder.Append("</tr></table>");
-        }
-
-        builder.Append("</td></tr></mj-table>");
-        return builder.ToString();
-    }
-
-    private static string RenderIconTextBlock(EmailTemplateEditorBlock block)
-    {
-        var layout = GetBlockLayout(block, EmailTemplateEditorBlockLayout.Horizontal);
-        var builder = new StringBuilder();
-        builder.Append("        <mj-table padding=\"0\">");
-        var mediaCell = $"<td style=\"width:56px;padding:0 16px 0 0;vertical-align:top;\"><img src=\"{EncodeAttribute(block.ImageUrl ?? string.Empty)}\" alt=\"{EncodeAttribute(block.AltText ?? "Feature icon")}\" style=\"display:block;width:56px;height:56px;border:0;border-radius:16px;\" /></td>";
-        var contentCell = new StringBuilder();
-        contentCell.Append("<td style=\"vertical-align:top;\">");
-        contentCell.Append($"<div style=\"{BuildTextStyle(block, 16, "#0f172a", "700", includeAlignment: false)}\">{EncodeText(block.TextContent ?? string.Empty)}</div>");
-
-        if (!string.IsNullOrWhiteSpace(block.SecondaryText))
-        {
-            contentCell.Append($"<div style=\"margin-top:4px;color:#475569;font-size:14px;line-height:22px;\">{EncodeText(block.SecondaryText)}</div>");
-        }
-
-        contentCell.Append("</td>");
-
-        if (layout == EmailTemplateEditorBlockLayout.Vertical)
-        {
-            builder.Append($"<tr><td style=\"padding:0 0 12px 0;\"><img src=\"{EncodeAttribute(block.ImageUrl ?? string.Empty)}\" alt=\"{EncodeAttribute(block.AltText ?? "Feature icon")}\" style=\"display:block;width:56px;height:56px;border:0;border-radius:16px;\" /></td></tr>");
-            builder.Append($"<tr>{contentCell}</tr>");
-        }
-        else if (layout == EmailTemplateEditorBlockLayout.HorizontalReverse)
-        {
-            builder.Append($"<tr>{contentCell}{mediaCell}</tr>");
-        }
-        else
-        {
-            builder.Append($"<tr>{mediaCell}{contentCell}</tr>");
-        }
-
-        builder.Append("</mj-table>");
-        return builder.ToString();
-    }
-
-    private static string RenderPromoBannerBlock(EmailTemplateEditorBlock block)
-    {
-        var layout = GetBlockLayout(block, EmailTemplateEditorBlockLayout.Vertical);
-        var actionPlacement = GetActionPlacement(block);
-        var actionHtml = BuildOptionalHtmlButton(block, "#ffffff", "#0f172a");
-        var builder = new StringBuilder();
-        builder.Append("        <mj-table padding=\"0\">");
-        builder.Append("<tr><td style=\"");
-        builder.Append(BuildCardContainerStyle(block, "#0f172a", block.BorderColor ?? "#0f172a", block.BorderWidth ?? 0, 20));
-        builder.Append("padding:20px;\">");
-        var copyHtml = new StringBuilder();
-        copyHtml.Append($"<div style=\"{BuildTextStyle(block, 20, "#ffffff", "700")}\">{EncodeText(block.TextContent ?? string.Empty)}</div>");
-
-        if (!string.IsNullOrWhiteSpace(block.SecondaryText))
-        {
-            copyHtml.Append($"<div style=\"margin-top:8px;color:#cbd5e1;font-size:14px;line-height:22px;text-align:{ToCssTextAlign(block.Alignment)};\">{EncodeText(block.SecondaryText)}</div>");
-        }
-
-        if (layout == EmailTemplateEditorBlockLayout.Vertical)
-        {
-            if (actionPlacement == EmailTemplateEditorBlockActionPlacement.BeforeContent && actionHtml.Length > 0)
-            {
-                builder.Append($"<div style=\"margin-bottom:16px;text-align:{ToCssTextAlign(block.Alignment)};\">{actionHtml}</div>");
-            }
-
-            builder.Append(copyHtml);
-
-            if (actionPlacement == EmailTemplateEditorBlockActionPlacement.AfterContent && actionHtml.Length > 0)
-            {
-                builder.Append($"<div style=\"margin-top:16px;text-align:{ToCssTextAlign(block.Alignment)};\">{actionHtml}</div>");
-            }
-        }
-        else
-        {
-            var actionCell = actionHtml.Length > 0
-                ? $"<td style=\"vertical-align:middle;padding:0;white-space:nowrap;\">{actionHtml}</td>"
-                : "<td></td>";
-            var copyCell = $"<td style=\"vertical-align:middle;padding:0 16px 0 0;\">{copyHtml}</td>";
-            builder.Append("<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" border=\"0\"><tr>");
-            builder.Append(layout == EmailTemplateEditorBlockLayout.HorizontalReverse
-                ? $"{actionCell}{copyCell}"
-                : $"{copyCell}{actionCell}");
-            builder.Append("</tr></table>");
-        }
-
-        builder.Append("</td></tr></mj-table>");
-        return builder.ToString();
-    }
 
     private static string RenderLinksBlock(EmailTemplateEditorBlock block, bool inlineByDefault, EmailTemplateEditorAlignment defaultAlignment)
     {
@@ -441,8 +284,8 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
             separator,
             block.Items.Select(item =>
                 $"<a href=\"{EncodeAttribute(item.Url)}\" style=\"color:{textColor};text-decoration:none;font-weight:600;\">{EncodeText(item.Label)}</a>"));
-
-        return $"        <mj-text font-size=\"{fontSize}px\" color=\"{textColor}\" align=\"{alignment}\">{links}</mj-text>";
+        var paddingAttr = block.BlockPadding is not null ? $" padding=\"{block.BlockPadding.Value}px\"" : string.Empty;
+        return $"        <mj-text font-size=\"{fontSize}px\" color=\"{textColor}\" align=\"{alignment}\"{paddingAttr}>{links}</mj-text>";
     }
 
     private static void AppendTextStyleAttributes(
@@ -496,6 +339,14 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
         if (block.TextDecoration is not null)
         {
             builder.Append($" text-decoration=\"{ToCssTextDecoration(block.TextDecoration.Value)}\"");
+        }
+    }
+
+    private static void AppendPaddingAttribute(StringBuilder builder, EmailTemplateEditorBlock block)
+    {
+        if (block.BlockPadding is not null)
+        {
+            builder.Append($" padding=\"{block.BlockPadding.Value}px\"");
         }
     }
 
@@ -679,4 +530,76 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
     private static string EncodeText(string value) => WebUtility.HtmlEncode(value);
 
     private static string EncodeAttribute(string value) => WebUtility.HtmlEncode(value);
+
+    private static HtmlSanitizer CreateBlockSanitizer()
+    {
+        var sanitizer = new HtmlSanitizer();
+        sanitizer.AllowedTags.Clear();
+        sanitizer.AllowedTags.Add("strong");
+        sanitizer.AllowedTags.Add("em");
+        sanitizer.AllowedTags.Add("u");
+        sanitizer.AllowedTags.Add("a");
+        sanitizer.AllowedTags.Add("br");
+        sanitizer.AllowedTags.Add("p");
+        sanitizer.AllowedAttributes.Clear();
+        sanitizer.AllowedAttributes.Add("href");
+        sanitizer.AllowedAttributes.Add("target");
+        sanitizer.AllowedAttributes.Add("style");
+        sanitizer.AllowedCssProperties.Clear();
+        sanitizer.AllowedCssProperties.Add("color");
+        sanitizer.AllowedCssProperties.Add("font-family");
+        sanitizer.AllowedCssProperties.Add("text-decoration");
+        sanitizer.AllowedSchemes.Clear();
+        sanitizer.AllowedSchemes.Add("http");
+        sanitizer.AllowedSchemes.Add("https");
+        sanitizer.AllowedSchemes.Add("mailto");
+        sanitizer.PostProcessNode += AddRelToBlankLinks;
+        return sanitizer;
+    }
+
+    private static HtmlSanitizer CreateInlineSanitizer()
+    {
+        var sanitizer = new HtmlSanitizer();
+        sanitizer.AllowedTags.Clear();
+        sanitizer.AllowedTags.Add("strong");
+        sanitizer.AllowedTags.Add("em");
+        sanitizer.AllowedTags.Add("u");
+        sanitizer.AllowedTags.Add("a");
+        sanitizer.AllowedAttributes.Clear();
+        sanitizer.AllowedAttributes.Add("href");
+        sanitizer.AllowedAttributes.Add("target");
+        sanitizer.AllowedAttributes.Add("style");
+        sanitizer.AllowedCssProperties.Clear();
+        sanitizer.AllowedCssProperties.Add("color");
+        sanitizer.AllowedCssProperties.Add("font-family");
+        sanitizer.AllowedCssProperties.Add("text-decoration");
+        sanitizer.AllowedSchemes.Clear();
+        sanitizer.AllowedSchemes.Add("http");
+        sanitizer.AllowedSchemes.Add("https");
+        sanitizer.AllowedSchemes.Add("mailto");
+        sanitizer.PostProcessNode += AddRelToBlankLinks;
+        return sanitizer;
+    }
+
+    private static void AddRelToBlankLinks(object? sender, PostProcessNodeEventArgs args)
+    {
+        if (args.Node is AngleSharp.Dom.IElement el &&
+            el.TagName.Equals("A", StringComparison.OrdinalIgnoreCase) &&
+            el.GetAttribute("target") == "_blank")
+        {
+            el.SetAttribute("rel", "noopener noreferrer");
+        }
+    }
+
+    private static string SanitizeBlock(string? value)
+    {
+        var sanitizer = CreateBlockSanitizer();
+        return sanitizer.Sanitize(value ?? string.Empty);
+    }
+
+    private static string SanitizeInline(string? value)
+    {
+        var sanitizer = CreateInlineSanitizer();
+        return sanitizer.Sanitize(value ?? string.Empty);
+    }
 }

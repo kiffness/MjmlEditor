@@ -8,8 +8,10 @@ public sealed class EmailTemplateEditorBlockDocument
 {
     public string Id { get; init; } = string.Empty;
 
-    [BsonRepresentation(BsonType.String)]
-    public EmailTemplateEditorBlockType Type { get; init; }
+    // Stored as a raw string so that documents containing removed block types
+    // (e.g. IconText, FeatureCard) can still be deserialized without error.
+    // Unknown values are filtered out in MongoEmailTemplateRepository.MapToDomain.
+    public string Type { get; init; } = string.Empty;
 
     public string? TextContent { get; init; }
 
@@ -65,6 +67,11 @@ public sealed class EmailTemplateEditorBlockDocument
     public int? BorderRadius { get; init; }
 
     public int? WidthPercentage { get; init; }
+
+    public int? BlockPadding { get; init; }
+
+    [BsonRepresentation(BsonType.String)]
+    public EmailTemplateEditorHeadingLevel? HeadingLevel { get; init; }
 
     public IReadOnlyList<EmailTemplateEditorBlockItemDocument> Items { get; init; } = [];
 }

@@ -9,13 +9,11 @@ import {
 } from './builderModel'
 
 describe('builderModel', () => {
-  it('creates property cards with the expected configurable defaults', () => {
-    const block = createDefaultBlock('PropertyCard')
+  it('creates hero blocks with the expected configurable defaults', () => {
+    const block = createDefaultBlock('Hero')
 
-    expect(block.type).toBe('PropertyCard')
-    expect(block.layout).toBe('Vertical')
-    expect(block.actionPlacement).toBe('AfterContent')
-    expect(block.actionLabel).toBe('View property')
+    expect(block.type).toBe('Hero')
+    expect(block.textContent).toBeTruthy()
   })
 
   it('falls back to a horizontal layout for social links without an explicit layout', () => {

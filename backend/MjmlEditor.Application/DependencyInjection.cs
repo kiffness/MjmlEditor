@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using MjmlEditor.Application.Auth;
+using MjmlEditor.Application.BrandLibrary;
 using MjmlEditor.Application.Templates;
 using MjmlEditor.Application.Tenancy;
 
@@ -16,6 +17,7 @@ public static class DependencyInjection
         services.AddScoped<IEmailTemplateMjmlGenerator, EmailTemplateMjmlGenerator>();
         services.AddScoped<IMjmlTemplateService, MjmlTemplateService>();
         services.AddScoped<ITenantService, TenantService>();
+        services.AddScoped<IBrandLibraryService, BrandLibraryService>();
 
         return services;
     }

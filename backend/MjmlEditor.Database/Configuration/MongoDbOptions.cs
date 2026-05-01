@@ -20,4 +20,7 @@ public sealed class MongoDbOptions
 
     [Required(AllowEmptyStrings = false)]
     public string UsersCollectionName { get; init; } = "users";
+
+    [Required(AllowEmptyStrings = false)]
+    public string BrandLibraryCollectionName { get; init; } = "brand_libraries";
 }

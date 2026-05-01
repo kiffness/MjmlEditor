@@ -4,10 +4,12 @@ using Microsoft.Extensions.Options;
 using MjmlEditor.Application.Auth;
 using MjmlEditor.Application.Templates;
 using MjmlEditor.Application.Tenancy;
+using MjmlEditor.Database.BrandLibrary;
 using MjmlEditor.Database.Configuration;
 using MjmlEditor.Database.Templates;
 using MjmlEditor.Database.Tenants;
 using MjmlEditor.Database.Users;
+using MjmlEditor.Domain.BrandLibrary;
 using MongoDB.Driver;
 
 namespace MjmlEditor.Database;
@@ -38,6 +40,9 @@ public static class DependencyInjection
             .Validate(
                 options => !string.IsNullOrWhiteSpace(options.UsersCollectionName),
                 $"{MongoDbOptions.SectionName}:UsersCollectionName is required.")
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.BrandLibraryCollectionName),
+                $"{MongoDbOptions.SectionName}:BrandLibraryCollectionName is required.")
             .ValidateOnStart();
 
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<MongoDbOptions>>().Value);
@@ -47,6 +52,7 @@ public static class DependencyInjection
         services.AddScoped<IUserAccountRepository, MongoUserAccountRepository>();
         services.AddScoped<IEmailTemplateRepository, MongoEmailTemplateRepository>();
         services.AddScoped<ITenantRepository, MongoTenantRepository>();
+        services.AddScoped<IBrandLibraryRepository, MongoBrandLibraryRepository>();
 
         return services;
     }

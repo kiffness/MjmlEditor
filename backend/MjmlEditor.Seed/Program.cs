@@ -229,7 +229,7 @@ static MjmlEditor.Database.Templates.EmailTemplateEditorDocument CreateEditorDoc
                             new EmailTemplateEditorBlockDocument
                             {
                                 Id = Guid.NewGuid().ToString("N"),
-                                Type = EmailTemplateEditorBlockType.Hero,
+                                Type = EmailTemplateEditorBlockType.Hero.ToString(),
                                 TextContent = heading,
                                 BackgroundColor = "#ffffff",
                                 TextColor = "#1f2937",
@@ -239,7 +239,7 @@ static MjmlEditor.Database.Templates.EmailTemplateEditorDocument CreateEditorDoc
                             new EmailTemplateEditorBlockDocument
                             {
                                 Id = Guid.NewGuid().ToString("N"),
-                                Type = EmailTemplateEditorBlockType.Text,
+                                Type = EmailTemplateEditorBlockType.Text.ToString(),
                                 TextContent = summary,
                                 TextColor = "#4b5563",
                                 Alignment = EmailTemplateEditorAlignment.Left,
@@ -248,7 +248,7 @@ static MjmlEditor.Database.Templates.EmailTemplateEditorDocument CreateEditorDoc
                             new EmailTemplateEditorBlockDocument
                             {
                                 Id = Guid.NewGuid().ToString("N"),
-                                Type = EmailTemplateEditorBlockType.Button,
+                                Type = EmailTemplateEditorBlockType.Button.ToString(),
                                 ActionLabel = ctaText,
                                 ActionUrl = "https://example.com/offers",
                                 BackgroundColor = "#2563eb",

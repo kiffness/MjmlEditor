@@ -55,6 +55,8 @@ Completed after `v1`:
 - unit testing foundation in both stacks
   - xUnit coverage in the backend
   - Vitest coverage in the frontend
+- advanced style controls (typography, spacing, surfaces, media, brand library)
+- explodable presets and preset internal layout controls
 
 ## Roadmap principles
 
@@ -93,69 +95,18 @@ Complex preset-style compositions should become more flexible over time:
 
 Immediate execution order:
 
-1. Expand advanced style controls.
-2. Add explodable presets and improve preset internal layout controls.
-3. Continue with brand library, saved sections, and rich text editing.
+1. ~~Expand advanced style controls.~~
+2. ~~Add explodable presets and improve preset internal layout controls.~~
+3. Add rich text editing.
+4. Add saved sections library.
 
 Documentation and tests should now be updated continuously as new features and architectural changes land.
 
-### 1. Expand advanced style controls
+### ~~1. Expand advanced style controls~~ ✓
 
-Add targeted styling depth without abandoning the structured model.
+### ~~2. Add explodable presets~~ ✓
 
-Focus areas:
-
-- Typography:
-  - font family
-  - font weight
-  - line height
-  - letter spacing
-  - text transform
-  - text alignment
-- Spacing:
-  - per-block padding
-  - section spacing
-  - column spacing
-- Surfaces:
-  - background color
-  - border
-  - border radius
-- Media and buttons:
-  - image width/alignment
-  - button width
-  - border/radius controls
-- Section/column styling:
-  - column background
-  - vertical alignment
-- Consistency controls:
-  - brand library for reusable text styles such as Heading 1/2/3 and Paragraph
-  - curated brand color palette shown first anywhere colors are editable
-  - CTA brand styles such as primary/secondary button treatments
-  - support for block defaults from the brand library with per-instance overrides where needed
-  - a dedicated brand-library page reachable from the editor
-  - a live preview on that page using representative content such as a logo, heading, paragraph, CTA, and footer
-  - instant preview updates as brand-library settings change
-
-### 2. Add explodable presets
-
-Evolve complex marketing compositions into presets that can either:
-
-- expose internal arrangement controls, or
-- be exploded into editable basic blocks inside the existing section/column system
-
-This should keep the editor opinionated while giving marketers more practical freedom.
-
-### 3. Improve preset internal layout controls
-
-Composed presets like the property card need more internal flexibility.
-
-Examples:
-
-- centered text
-- configurable image/text arrangement
-- CTA placement options
-- optional element visibility
-- limited element ordering controls
+### ~~3. Improve preset internal layout controls~~ ✓
 
 ### 4. Add rich text editing
 

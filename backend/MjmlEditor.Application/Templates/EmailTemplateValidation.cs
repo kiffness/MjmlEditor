@@ -135,9 +135,9 @@ public static class EmailTemplateValidation
                 errors.Add(new ValidationError($"EditorDocument.Sections[{sectionIndex}].Id", "Section id is required."));
             }
 
-            if (section.Padding is not null && section.Padding <= 0)
+            if (section.Padding is not null && section.Padding < 0)
             {
-                errors.Add(new ValidationError($"EditorDocument.Sections[{sectionIndex}].Padding", "Section padding must be positive when provided."));
+                errors.Add(new ValidationError($"EditorDocument.Sections[{sectionIndex}].Padding", "Section padding must be zero or greater when provided."));
             }
 
             if (section.Columns.Count == 0)
@@ -160,6 +160,13 @@ public static class EmailTemplateValidation
                     errors.Add(new ValidationError(
                         $"EditorDocument.Sections[{sectionIndex}].Columns[{columnIndex}].WidthPercentage",
                         "Column widthPercentage must be between 1 and 100."));
+                }
+
+                if (column.Padding is not null && column.Padding < 0)
+                {
+                    errors.Add(new ValidationError(
+                        $"EditorDocument.Sections[{sectionIndex}].Columns[{columnIndex}].Padding",
+                        "Column padding must be zero or greater when provided."));
                 }
 
                 if (column.VerticalAlignment is not null && !Enum.IsDefined(column.VerticalAlignment.Value))
@@ -249,6 +256,16 @@ public static class EmailTemplateValidation
                         errors.Add(new ValidationError($"{fieldPrefix}.WidthPercentage", "WidthPercentage must be between 1 and 100 when provided."));
                     }
 
+                    if (block.BlockPadding is not null && block.BlockPadding < 0)
+                    {
+                        errors.Add(new ValidationError($"{fieldPrefix}.BlockPadding", "BlockPadding must be zero or greater when provided."));
+                    }
+
+                    if (block.HeadingLevel is not null && !Enum.IsDefined(block.HeadingLevel.Value))
+                    {
+                        errors.Add(new ValidationError($"{fieldPrefix}.HeadingLevel", "HeadingLevel is invalid."));
+                    }
+
                     var items = block.Items ?? [];
 
                     for (var itemIndex = 0; itemIndex < items.Count; itemIndex++)
@@ -279,25 +296,9 @@ public static class EmailTemplateValidation
                         case EmailTemplateEditorBlockType.Footer:
                         case EmailTemplateEditorBlockType.Badge:
                         case EmailTemplateEditorBlockType.Quote:
-                        case EmailTemplateEditorBlockType.FeatureCard:
-                        case EmailTemplateEditorBlockType.PromoBanner:
                             if (string.IsNullOrWhiteSpace(block.TextContent))
                             {
                                 errors.Add(new ValidationError($"{fieldPrefix}.TextContent", "TextContent is required for this block type."));
-                            }
-
-                            break;
-
-                        case EmailTemplateEditorBlockType.PropertyCard:
-                        case EmailTemplateEditorBlockType.IconText:
-                            if (string.IsNullOrWhiteSpace(block.TextContent))
-                            {
-                                errors.Add(new ValidationError($"{fieldPrefix}.TextContent", "TextContent is required for this block type."));
-                            }
-
-                            if (string.IsNullOrWhiteSpace(block.ImageUrl))
-                            {
-                                errors.Add(new ValidationError($"{fieldPrefix}.ImageUrl", "ImageUrl is required for this block type."));
                             }
 
                             break;

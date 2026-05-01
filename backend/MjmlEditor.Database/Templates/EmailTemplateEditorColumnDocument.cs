@@ -10,6 +10,8 @@ public sealed class EmailTemplateEditorColumnDocument
 
     public string? BackgroundColor { get; init; }
 
+    public int? Padding { get; init; }
+
     public EmailTemplateEditorVerticalAlignment? VerticalAlignment { get; init; }
 
     public IReadOnlyList<EmailTemplateEditorBlockDocument> Blocks { get; init; } = [];

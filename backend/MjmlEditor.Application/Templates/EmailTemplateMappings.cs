@@ -79,6 +79,7 @@ public static class EmailTemplateMappings
                     Id = column.Id,
                     WidthPercentage = column.WidthPercentage,
                     BackgroundColor = column.BackgroundColor,
+                    Padding = column.Padding,
                     VerticalAlignment = column.VerticalAlignment,
                     Blocks = column.Blocks.Select(block => new EmailTemplateEditorBlockDto
                     {
@@ -109,6 +110,8 @@ public static class EmailTemplateMappings
                         BorderWidth = block.BorderWidth,
                         BorderRadius = block.BorderRadius,
                         WidthPercentage = block.WidthPercentage,
+                        BlockPadding = block.BlockPadding,
+                        HeadingLevel = block.HeadingLevel,
                         Items = block.Items.Select(item => new EmailTemplateEditorBlockItemDto
                         {
                             Id = item.Id,
@@ -138,6 +141,7 @@ public static class EmailTemplateMappings
                     column.Id,
                     column.WidthPercentage,
                     column.BackgroundColor,
+                    column.Padding,
                     column.VerticalAlignment,
                     column.Blocks.Select(block => EmailTemplateEditorBlock.Create(
                         block.Id,
@@ -167,6 +171,8 @@ public static class EmailTemplateMappings
                         block.BorderWidth,
                         block.BorderRadius,
                         block.WidthPercentage,
+                        block.BlockPadding,
+                        block.HeadingLevel,
                         block.Items?.Select(item => EmailTemplateEditorBlockItem.Create(
                             item.Id,
                             item.Label,

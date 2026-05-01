@@ -26,7 +26,7 @@ public sealed class EmailTemplateValidationTests
     }
 
     [Fact]
-    public void ValidateCreate_RequiresImageUrl_ForPropertyCardBlocks()
+    public void ValidateCreate_RequiresImageUrl_ForImageBlocks()
     {
         var request = new CreateEmailTemplateRequest(
             "Property email",
@@ -35,7 +35,7 @@ public sealed class EmailTemplateValidationTests
             CreateEditorDocument(new EmailTemplateEditorBlockDto
             {
                 Id = "property-1",
-                Type = EmailTemplateEditorBlockType.PropertyCard,
+                Type = EmailTemplateEditorBlockType.Image,
                 TextContent = "Family home with garden"
             }));
 

@@ -8,6 +8,8 @@ public sealed class EmailTemplateEditorColumn
 
     public string? BackgroundColor { get; }
 
+    public int? Padding { get; }
+
     public EmailTemplateEditorVerticalAlignment? VerticalAlignment { get; }
 
     public IReadOnlyList<EmailTemplateEditorBlock> Blocks { get; }
@@ -16,6 +18,7 @@ public sealed class EmailTemplateEditorColumn
         string id,
         int widthPercentage,
         string? backgroundColor,
+        int? padding,
         EmailTemplateEditorVerticalAlignment? verticalAlignment,
         IReadOnlyList<EmailTemplateEditorBlock> blocks)
     {
@@ -24,6 +27,11 @@ public sealed class EmailTemplateEditorColumn
         if (widthPercentage <= 0 || widthPercentage > 100)
         {
             throw new ArgumentOutOfRangeException(nameof(widthPercentage), widthPercentage, "WidthPercentage must be between 1 and 100.");
+        }
+
+        if (padding is not null && padding < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(padding), padding, "Padding must be non-negative when provided.");
         }
 
         if (verticalAlignment is not null && !Enum.IsDefined(verticalAlignment.Value))
@@ -35,6 +43,7 @@ public sealed class EmailTemplateEditorColumn
             NormalizeRequired(id, nameof(id)),
             widthPercentage,
             NormalizeOptional(backgroundColor),
+            padding,
             verticalAlignment,
             blocks.Select(block => block.Clone()).ToArray());
     }
@@ -43,27 +52,30 @@ public sealed class EmailTemplateEditorColumn
         string id,
         int widthPercentage,
         string? backgroundColor,
+        int? padding,
         EmailTemplateEditorVerticalAlignment? verticalAlignment,
         IReadOnlyList<EmailTemplateEditorBlock> blocks)
     {
-        return Create(id, widthPercentage, backgroundColor, verticalAlignment, blocks);
+        return Create(id, widthPercentage, backgroundColor, padding, verticalAlignment, blocks);
     }
 
     public EmailTemplateEditorColumn Clone()
     {
-        return Restore(Id, WidthPercentage, BackgroundColor, VerticalAlignment, Blocks);
+        return Restore(Id, WidthPercentage, BackgroundColor, Padding, VerticalAlignment, Blocks);
     }
 
     private EmailTemplateEditorColumn(
         string id,
         int widthPercentage,
         string? backgroundColor,
+        int? padding,
         EmailTemplateEditorVerticalAlignment? verticalAlignment,
         IReadOnlyList<EmailTemplateEditorBlock> blocks)
     {
         Id = id;
         WidthPercentage = widthPercentage;
         BackgroundColor = backgroundColor;
+        Padding = padding;
         VerticalAlignment = verticalAlignment;
         Blocks = blocks;
     }

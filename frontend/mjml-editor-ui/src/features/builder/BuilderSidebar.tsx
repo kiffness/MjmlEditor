@@ -1,6 +1,5 @@
 import type {
   EditorAlignment,
-  EditorBlockActionPlacement,
   EditorBlock,
   EditorBlockItem,
   EditorBlockLayout,
@@ -10,9 +9,9 @@ import type {
   EditorTextDecoration,
   EditorTextTransform,
   EditorVerticalAlignment,
+  BrandColorDto,
 } from '../../lib/api'
 import {
-  actionPlacementOptions,
   blockLayoutOptions,
   builderBlockPalette,
   builderPresetOptions,
@@ -30,6 +29,8 @@ import {
   type BuilderSidebarTab,
   type TemplateDraft,
 } from './builderModel'
+import { ColorInput } from './ColorInput'
+import RichTextEditor from './RichTextEditor'
 
 type BlockItemsEditorProps = {
   items: EditorBlockItem[]
@@ -118,38 +119,8 @@ function BlockPaletteIcon({ type }: { type: EditorBlockType }) {
     case 'Logo':
       return (
         <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
-          <rect x="4" y="5" width="16" height="14" rx="2.5" stroke={stroke} strokeWidth="1.8" />
-          <circle cx="9" cy="10" r="1.4" fill={stroke} />
-          <path d="M7 16l3.2-3 2.3 2 3.5-4 2 5" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )
-    case 'PropertyCard':
-      return (
-        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
-          <rect x="4" y="5" width="16" height="14" rx="2.5" stroke={stroke} strokeWidth="1.8" />
-          <path d="M7 10.5h10M7 14.5h7" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" />
-          <path d="M7 8l2.2 2.2L12 7.5l5 5.5" stroke={stroke} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      )
-    case 'FeatureCard':
-      return (
-        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
           <rect x="5" y="5" width="14" height="14" rx="3" stroke={stroke} strokeWidth="1.8" />
           <path d="M9 10h6M8 14.5h8" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
-        </svg>
-      )
-    case 'IconText':
-      return (
-        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
-          <circle cx="8" cy="12" r="3" stroke={stroke} strokeWidth="1.8" />
-          <path d="M13 9h6M13 12h6M13 15h4" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
-        </svg>
-      )
-    case 'PromoBanner':
-      return (
-        <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5" aria-hidden="true">
-          <path d="M5 8h14v8H5z" stroke={stroke} strokeWidth="1.8" />
-          <path d="M8 12h8" stroke={stroke} strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       )
     case 'Button':
@@ -211,52 +182,12 @@ function BlockPaletteIcon({ type }: { type: EditorBlockType }) {
   }
 }
 
-function toLayoutLabel(type: EditorBlockType, value: EditorBlockLayout) {
-  if (type === 'PropertyCard') {
-    return value === 'Vertical'
-      ? 'Stacked image'
-      : value === 'Horizontal'
-        ? 'Image left'
-        : 'Image right'
-  }
-
-  if (type === 'IconText') {
-    return value === 'Vertical'
-      ? 'Icon top'
-      : value === 'Horizontal'
-        ? 'Icon left'
-        : 'Icon right'
-  }
-
-  if (type === 'PromoBanner') {
-    return value === 'Vertical'
-      ? 'Stacked'
-      : value === 'Horizontal'
-        ? 'Copy left / CTA right'
-        : 'CTA left / copy right'
-  }
-
-  if (type === 'FeatureCard') {
-    return value === 'Vertical'
-      ? 'Stacked'
-      : value === 'Horizontal'
-        ? 'Title left / detail right'
-        : 'Detail left / title right'
-  }
-
+function toLayoutLabel(value: EditorBlockLayout) {
   return value === 'Vertical'
     ? 'Vertical'
     : value === 'Horizontal'
       ? 'Horizontal'
       : 'Horizontal reverse'
-}
-
-function toActionPlacementLabel(type: EditorBlockType, value: EditorBlockActionPlacement) {
-  if (type === 'PromoBanner') {
-    return value === 'BeforeContent' ? 'CTA before copy' : 'CTA after copy'
-  }
-
-  return value === 'BeforeContent' ? 'CTA before details' : 'CTA after details'
 }
 
 function SectionLayoutIcon({ columns }: { columns: number }) {
@@ -335,6 +266,7 @@ type BuilderSidebarProps = {
   handleSelectBlock: (sectionId: string, columnId: string, blockId: string) => void
   handleStartBuilder: (preset?: BuilderPreset) => void
   clearDragState: () => void
+  brandColors: BrandColorDto[]
 }
 
 export function BuilderSidebar({
@@ -452,55 +384,29 @@ export function BuilderSidebar({
                   <p className="mt-1 text-xs text-slate-500">{selectedBlock.id}</p>
 
                   <div className="mt-4 space-y-3">
-                    {['Hero', 'Text', 'Badge', 'Footer'].includes(selectedBlock.type) && (
+                    {(['Hero', 'Text', 'Footer'] as EditorBlockType[]).includes(selectedBlock.type) && (
                       <label className="block">
                         <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                           Copy
                         </span>
-                        <textarea
-                          value={selectedBlock.textContent ?? ''}
-                          onChange={(event) => handleUpdateSelectedBlock({ textContent: event.target.value })}
-                          className="min-h-[140px] w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
+                        <RichTextEditor
+                          value={selectedBlock.textContent}
+                          onChange={(html) => handleUpdateSelectedBlock({ textContent: html })}
                         />
                       </label>
                     )}
 
-                    {['PropertyCard', 'FeatureCard', 'IconText', 'PromoBanner'].includes(selectedBlock.type) && (
-                      <>
-                        <label className="block">
-                          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                            Primary text
-                          </span>
-                          <textarea
-                            value={selectedBlock.textContent ?? ''}
-                            onChange={(event) => handleUpdateSelectedBlock({ textContent: event.target.value })}
-                            className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                          />
-                        </label>
-                        <label className="block">
-                          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                            {selectedBlock.type === 'FeatureCard'
-                              ? 'Supporting detail'
-                              : selectedBlock.type === 'IconText'
-                                ? 'Body copy'
-                                : 'Secondary text'}
-                          </span>
-                          {selectedBlock.type === 'IconText' ? (
-                            <textarea
-                              value={selectedBlock.secondaryText ?? ''}
-                              onChange={(event) => handleUpdateSelectedBlock({ secondaryText: event.target.value })}
-                              className="min-h-[120px] w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                            />
-                          ) : (
-                            <input
-                              type="text"
-                              value={selectedBlock.secondaryText ?? ''}
-                              onChange={(event) => handleUpdateSelectedBlock({ secondaryText: event.target.value })}
-                              className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                            />
-                          )}
-                        </label>
-                      </>
+                    {selectedBlock.type === 'Badge' && (
+                      <label className="block">
+                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                          Label
+                        </span>
+                        <RichTextEditor
+                          value={selectedBlock.textContent}
+                          onChange={(html) => handleUpdateSelectedBlock({ textContent: html })}
+                          inline
+                        />
+                      </label>
                     )}
 
                     {selectedBlock.type === 'Quote' && (
@@ -509,27 +415,26 @@ export function BuilderSidebar({
                           <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                             Quote
                           </span>
-                          <textarea
-                            value={selectedBlock.textContent ?? ''}
-                            onChange={(event) => handleUpdateSelectedBlock({ textContent: event.target.value })}
-                            className="min-h-[140px] w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
+                          <RichTextEditor
+                            value={selectedBlock.textContent}
+                            onChange={(html) => handleUpdateSelectedBlock({ textContent: html })}
+                            inline
                           />
                         </label>
                         <label className="block">
                           <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                             Attribution
                           </span>
-                          <input
-                            type="text"
-                            value={selectedBlock.secondaryText ?? ''}
-                            onChange={(event) => handleUpdateSelectedBlock({ secondaryText: event.target.value })}
-                            className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
+                          <RichTextEditor
+                            value={selectedBlock.secondaryText}
+                            onChange={(html) => handleUpdateSelectedBlock({ secondaryText: html })}
+                            inline
                           />
                         </label>
                       </>
                     )}
 
-                    {(['Image', 'Logo', 'PropertyCard', 'IconText'] as EditorBlockType[]).includes(selectedBlock.type) && (
+                    {(['Image', 'Logo'] as EditorBlockType[]).includes(selectedBlock.type) && (
                       <>
                         <label className="block">
                           <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
@@ -538,7 +443,7 @@ export function BuilderSidebar({
                           <input
                             type="text"
                             value={selectedBlock.imageUrl ?? ''}
-                            onChange={(event) => handleUpdateSelectedBlock({ imageUrl: event.target.value })}
+                            onChange={(event) => handleUpdateSelectedBlock({ imageUrl: event.target.value || null })}
                             className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
                           />
                         </label>
@@ -569,7 +474,7 @@ export function BuilderSidebar({
                       </>
                     )}
 
-                    {(['Button', 'PropertyCard', 'PromoBanner'] as EditorBlockType[]).includes(selectedBlock.type) && (
+                    {selectedBlock.type === 'Button' && (
                       <>
                         <label className="block">
                           <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
@@ -631,11 +536,10 @@ export function BuilderSidebar({
                         <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                           Secondary line
                         </span>
-                        <input
-                          type="text"
-                          value={selectedBlock.secondaryText ?? ''}
-                          onChange={(event) => handleUpdateSelectedBlock({ secondaryText: event.target.value })}
-                          className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
+                        <RichTextEditor
+                          value={selectedBlock.secondaryText}
+                          onChange={(html) => handleUpdateSelectedBlock({ secondaryText: html })}
+                          inline
                         />
                       </label>
                     )}
@@ -650,6 +554,7 @@ export function BuilderSidebar({
                         onRemove={handleRemoveSelectedBlockItem}
                       />
                     )}
+
                   </div>
                 </div>
               )}
@@ -866,11 +771,9 @@ export function BuilderSidebar({
                           <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                             Background
                           </span>
-                          <input
-                            type="text"
+                          <ColorInput
                             value={selectedSection.backgroundColor ?? ''}
-                            onChange={(event) => handleUpdateSection({ backgroundColor: event.target.value })}
-                            className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
+                            onChange={(v) => handleUpdateSection({ backgroundColor: v })}
                           />
                         </label>
                         <label className="block">
@@ -913,11 +816,9 @@ export function BuilderSidebar({
                           <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                             Background
                           </span>
-                          <input
-                            type="text"
+                          <ColorInput
                             value={selectedColumn.backgroundColor ?? ''}
-                            onChange={(event) => handleUpdateSelectedColumn({ backgroundColor: toOptionalText(event.target.value) })}
-                            className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
+                            onChange={(v) => handleUpdateSelectedColumn({ backgroundColor: toOptionalText(v) })}
                           />
                         </label>
                         <label className="block">
@@ -935,6 +836,18 @@ export function BuilderSidebar({
                               </option>
                             ))}
                           </select>
+                        </label>
+                        <label className="block">
+                          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                            Padding
+                          </span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={selectedColumn.padding ?? ''}
+                            onChange={(event) => handleUpdateSelectedColumn({ padding: toOptionalNumber(event.target.value) })}
+                            className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
+                          />
                         </label>
                       </div>
                     </div>
@@ -961,60 +874,53 @@ export function BuilderSidebar({
                           </label>
                         )}
 
-                        {['LinkList', 'SocialLinks', 'PropertyCard', 'FeatureCard', 'IconText', 'PromoBanner'].includes(selectedBlock.type) && (
+                        {['LinkList', 'SocialLinks'].includes(selectedBlock.type) && (
                           <label className="block">
                             <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                               Layout
                             </span>
                             <select
-                              value={selectedBlock.layout ?? (selectedBlock.type === 'SocialLinks' || selectedBlock.type === 'IconText' ? 'Horizontal' : 'Vertical')}
+                              value={selectedBlock.layout ?? (selectedBlock.type === 'SocialLinks' ? 'Horizontal' : 'Vertical')}
                               onChange={(event) => handleUpdateSelectedBlock({ layout: event.target.value as EditorBlockLayout })}
                               className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
                             >
                               {blockLayoutOptions
-                                .filter((option) => (
-                                  ['PropertyCard', 'FeatureCard', 'IconText', 'PromoBanner'].includes(selectedBlock.type)
-                                  || option.value !== 'HorizontalReverse'
-                                ))
+                                .filter((option) => option.value !== 'HorizontalReverse')
                                 .map((option) => (
                                   <option key={option.value} value={option.value}>
-                                    {toLayoutLabel(selectedBlock.type, option.value)}
+                                    {toLayoutLabel(option.value)}
                                   </option>
                                 ))}
                             </select>
                           </label>
                         )}
 
-                        {['PropertyCard', 'PromoBanner'].includes(selectedBlock.type) && (
+                        {selectedBlock.type === 'Hero' && (
                           <label className="block">
                             <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                              CTA placement
+                              Heading level
                             </span>
                             <select
-                              value={selectedBlock.actionPlacement ?? 'AfterContent'}
-                              onChange={(event) => handleUpdateSelectedBlock({ actionPlacement: event.target.value as EditorBlockActionPlacement })}
+                              value={selectedBlock.headingLevel ?? 'H1'}
+                              onChange={(event) => handleUpdateSelectedBlock({ headingLevel: event.target.value as 'H1' | 'H2' | 'H3' })}
                               className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
                             >
-                              {actionPlacementOptions.map((option) => (
-                                <option key={option.value} value={option.value}>
-                                  {toActionPlacementLabel(selectedBlock.type, option.value)}
-                                </option>
-                              ))}
+                              <option value="H1">H1</option>
+                              <option value="H2">H2</option>
+                              <option value="H3">H3</option>
                             </select>
                           </label>
                         )}
 
-                        {['Hero', 'Text', 'Footer', 'Badge', 'Quote', 'LinkList', 'SocialLinks', 'Button', 'PropertyCard', 'FeatureCard', 'IconText', 'PromoBanner'].includes(selectedBlock.type) && (
+                        {['Hero', 'Text', 'Footer', 'Badge', 'Quote', 'LinkList', 'SocialLinks', 'Button'].includes(selectedBlock.type) && (
                           <>
                             <label className="block">
                               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                                 Text color
                               </span>
-                              <input
-                                type="text"
+                              <ColorInput
                                 value={selectedBlock.textColor ?? ''}
-                                onChange={(event) => handleUpdateSelectedBlock({ textColor: event.target.value })}
-                                className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
+                                onChange={(v) => handleUpdateSelectedBlock({ textColor: v })}
                               />
                             </label>
                             <label className="block">
@@ -1122,31 +1028,27 @@ export function BuilderSidebar({
                           </>
                         )}
 
-                        {['Badge', 'Button', 'PropertyCard', 'FeatureCard', 'PromoBanner'].includes(selectedBlock.type) && (
+                        {['Badge', 'Button'].includes(selectedBlock.type) && (
                           <label className="block">
                             <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                               Background
                             </span>
-                            <input
-                              type="text"
+                            <ColorInput
                               value={selectedBlock.backgroundColor ?? ''}
-                              onChange={(event) => handleUpdateSelectedBlock({ backgroundColor: event.target.value })}
-                              className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
+                              onChange={(v) => handleUpdateSelectedBlock({ backgroundColor: v })}
                             />
                           </label>
                         )}
 
-                        {['Badge', 'Button', 'Image', 'Logo', 'Quote', 'PropertyCard', 'FeatureCard', 'PromoBanner'].includes(selectedBlock.type) && (
+                        {['Badge', 'Button', 'Image', 'Logo', 'Quote'].includes(selectedBlock.type) && (
                           <>
                             <label className="block">
                               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                                 Border color
                               </span>
-                              <input
-                                type="text"
+                              <ColorInput
                                 value={selectedBlock.borderColor ?? ''}
-                                onChange={(event) => handleUpdateSelectedBlock({ borderColor: toOptionalText(event.target.value) })}
-                                className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
+                                onChange={(v) => handleUpdateSelectedBlock({ borderColor: toOptionalText(v) })}
                               />
                             </label>
                             <label className="block">
@@ -1197,11 +1099,9 @@ export function BuilderSidebar({
                               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                                 Text color
                               </span>
-                              <input
-                                type="text"
+                              <ColorInput
                                 value={selectedBlock.textColor ?? ''}
-                                onChange={(event) => handleUpdateSelectedBlock({ textColor: event.target.value })}
-                                className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
+                                onChange={(v) => handleUpdateSelectedBlock({ textColor: v })}
                               />
                             </label>
                             <label className="block">
@@ -1242,11 +1142,9 @@ export function BuilderSidebar({
                               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                                 Divider color
                               </span>
-                              <input
-                                type="text"
+                              <ColorInput
                                 value={selectedBlock.dividerColor ?? ''}
-                                onChange={(event) => handleUpdateSelectedBlock({ dividerColor: event.target.value })}
-                                className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
+                                onChange={(v) => handleUpdateSelectedBlock({ dividerColor: v })}
                               />
                             </label>
                             <label className="block">
@@ -1262,6 +1160,21 @@ export function BuilderSidebar({
                               />
                             </label>
                           </>
+                        )}
+
+                        {selectedBlock.type !== 'Spacer' && (
+                          <label className="block">
+                            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                              Padding
+                            </span>
+                            <input
+                              type="number"
+                              min={0}
+                              value={selectedBlock.blockPadding ?? ''}
+                              onChange={(event) => handleUpdateSelectedBlock({ blockPadding: toOptionalNumber(event.target.value) })}
+                              className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
+                            />
+                          </label>
                         )}
                       </div>
                     </div>
