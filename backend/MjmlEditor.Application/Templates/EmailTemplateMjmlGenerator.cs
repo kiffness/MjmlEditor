@@ -6,6 +6,9 @@ namespace MjmlEditor.Application.Templates;
 
 internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
 {
+    /// <summary>
+    /// Generates canonical MJML for the structured editor document.
+    /// </summary>
     public string Generate(EmailTemplateEditorDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -285,6 +288,7 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
         var imageCell = $"<td style=\"{(layout == EmailTemplateEditorBlockLayout.Vertical ? string.Empty : "width:50%;")}vertical-align:top;padding:0;\"><img src=\"{EncodeAttribute(block.ImageUrl ?? string.Empty)}\" alt=\"{EncodeAttribute(block.AltText ?? "Featured property")}\" style=\"display:block;width:100%;height:auto;border:0;\" /></td>";
         var detailCell = $"<td style=\"vertical-align:top;padding:20px;\">{detailsBuilder}</td>";
         var builder = new StringBuilder();
+        // These composed blocks use nested tables because they need stable internal layout control across email clients.
         builder.Append("        <mj-table padding=\"0\">");
         builder.Append("<tr><td style=\"");
         builder.Append(BuildCardContainerStyle(block, "#ffffff", "#dbe4f0", 1, 20));
@@ -431,6 +435,7 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
         var alignment = ToMjmlAlignment(block.Alignment ?? defaultAlignment);
         var fontSize = block.FontSize ?? 14;
         var textColor = EncodeAttribute(block.TextColor ?? "#2563eb");
+        // Inline links use HTML separators because MJML does not provide a richer list primitive for this case.
         var separator = inline ? "&nbsp;&nbsp;&bull;&nbsp;&nbsp;" : "<br />";
         var links = string.Join(
             separator,

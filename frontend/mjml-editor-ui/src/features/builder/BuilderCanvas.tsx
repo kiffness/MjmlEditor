@@ -212,7 +212,7 @@ export function BuilderCanvas({
       </div>
 
       <div className="mt-6 min-h-[720px] rounded-[28px] border border-white/10 bg-slate-950/60 p-5">
-        <div className="mx-auto max-w-[760px] space-y-5">
+        <div className="mx-auto max-w-[600px] space-y-5">
           {draft.editorDocument.sections.length === 0 ? (
             <div className="rounded-[28px] border border-dashed border-white/10 bg-slate-950/30 px-8 py-16 text-center">
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-300">Empty builder</p>
@@ -475,6 +475,12 @@ function CanvasBlockPreview({
 }) {
   const frameStyle = getBlockFrameStyle(block)
   const contentWidth = block.widthPercentage ? `${block.widthPercentage}%` : '100%'
+  const explicitContentWidth = block.widthPercentage !== null && block.widthPercentage !== undefined
+    ? `${block.widthPercentage}%`
+    : undefined
+  const explicitButtonPreviewMaxWidth = block.widthPercentage !== null && block.widthPercentage !== undefined
+    ? `${Math.round(552 * (block.widthPercentage / 100))}px`
+    : undefined
   const layout = getBlockLayout(block)
   const actionPlacement = getBlockActionPlacement(block)
 
@@ -770,22 +776,34 @@ function CanvasBlockPreview({
             <InlineCanvasInput value={block.actionLabel ?? ''} placeholder="Button label" onChange={(value) => onUpdateBlock({ actionLabel: value })} />
           </div>
         ) : (
-          <div className="mt-3 flex" style={{ justifyContent: toFlexJustify(block.alignment) }}>
+          <div className="mt-3">
+            <div
+              data-testid={`builder-button-preview-${block.id}`}
+              className="max-w-full"
+              style={{
+                width: explicitContentWidth,
+                maxWidth: explicitButtonPreviewMaxWidth,
+                marginLeft: block.alignment === 'Center' || block.alignment === 'Right' ? 'auto' : undefined,
+                marginRight: block.alignment === 'Left' || block.alignment === 'Center' ? 'auto' : undefined,
+              }}
+            >
             <span
               className="inline-flex px-4 py-2 text-sm"
               style={{
                 backgroundColor: block.backgroundColor ?? '#2563eb',
-                borderRadius: block.borderRadius ?? 12,
+                borderRadius: block.borderRadius ?? undefined,
                 borderColor: block.borderColor ?? undefined,
                 borderWidth: block.borderWidth ?? undefined,
                 borderStyle: block.borderWidth ? 'solid' : undefined,
-                width: contentWidth,
+                width: explicitContentWidth ? '100%' : undefined,
+                maxWidth: '100%',
                 justifyContent: 'center',
                 ...getBlockTextStyle(block, { color: '#ffffff', fontSize: 14, fontWeight: '600' }),
               }}
             >
               {block.actionLabel || 'Button'}
             </span>
+            </div>
           </div>
         )}
       </div>

@@ -64,6 +64,7 @@ internal sealed class EmailTemplateService(
 
         if (request.Status == EmailTemplateStatus.Published)
         {
+            // Publishing is a dedicated workflow because it changes revision semantics beyond a normal draft save.
             throw new RequestValidationException([
                 new ValidationError("status", "Use the publish endpoint to publish a template revision.")
             ]);
@@ -180,6 +181,7 @@ internal sealed class EmailTemplateService(
 
     private string BuildCanonicalMjml(string requestedMjmlBody, Domain.Templates.EmailTemplateEditorDocument? editorDocument)
     {
+        // The visual builder is the source of truth whenever an editor document exists; raw MJML is only canonical in text mode.
         return editorDocument is null
             ? requestedMjmlBody.Trim()
             : mjmlGenerator.Generate(editorDocument);

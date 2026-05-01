@@ -5,6 +5,9 @@ namespace MjmlEditor.Application.Templates;
 
 public static class EmailTemplateMappings
 {
+    /// <summary>
+    /// Converts the aggregate root into the API shape returned to the frontend editor.
+    /// </summary>
     public static EmailTemplateDto ToDto(this EmailTemplate template)
     {
         ArgumentNullException.ThrowIfNull(template);
@@ -22,6 +25,9 @@ public static class EmailTemplateMappings
             template.EditorDocument?.ToDto());
     }
 
+    /// <summary>
+    /// Converts a template into the smaller library/list view projection.
+    /// </summary>
     public static EmailTemplateSummaryDto ToSummaryDto(this EmailTemplate template)
     {
         ArgumentNullException.ThrowIfNull(template);
@@ -34,6 +40,9 @@ public static class EmailTemplateMappings
             template.UpdatedAtUtc);
     }
 
+    /// <summary>
+    /// Converts a revision into the DTO used by the revision history UI.
+    /// </summary>
     public static EmailTemplateRevisionDto ToDto(this EmailTemplateRevision revision, string? publishedRevisionId)
     {
         ArgumentNullException.ThrowIfNull(revision);
@@ -50,6 +59,9 @@ public static class EmailTemplateMappings
             string.Equals(revision.Id, publishedRevisionId, StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// Converts the structured editor document from the domain model into the API DTO graph.
+    /// </summary>
     public static EmailTemplateEditorDocumentDto ToDto(this EmailTemplateEditorDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -109,6 +121,9 @@ public static class EmailTemplateMappings
         };
     }
 
+    /// <summary>
+    /// Converts the API editor document into the validated domain model used for persistence and MJML generation.
+    /// </summary>
     public static EmailTemplateEditorDocument ToDomain(this EmailTemplateEditorDocumentDto document)
     {
         ArgumentNullException.ThrowIfNull(document);

@@ -6,6 +6,9 @@ namespace MjmlEditor.Api.Endpoints;
 
 public static class EmailTemplateEndpoints
 {
+    /// <summary>
+    /// Registers the authenticated template-management and preview endpoints.
+    /// </summary>
     public static IEndpointRouteBuilder MapEmailTemplateEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var group = endpoints.MapGroup("/api/templates")

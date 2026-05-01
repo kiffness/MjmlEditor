@@ -48,10 +48,15 @@ import {
   isCanvasDraggedBlock,
   isPaletteDraggedBlock,
   moveItem,
-  serializeEditorDocument,
   type TemplateDraft,
   toDraft,
 } from './features/builder/builderModel'
+import {
+  cloneDraftState,
+  getDraftStateSignature,
+  getTemplateDraftStateSignature,
+  hasPersistedDraftChanges,
+} from './features/builder/draftState'
 
 type StatusFilter = 'All' | TemplateStatus
 
@@ -97,23 +102,6 @@ const previewViewportOptions: { id: PreviewViewport; label: string; width: numbe
 function getPreviewSignature(draft: TemplateDraft) {
   return JSON.stringify({
     mjmlBody: draft.editorDocument ? '' : draft.mjmlBody,
-    editorDocument: draft.editorDocument,
-  })
-}
-
-function cloneDraftState(draft: TemplateDraft): TemplateDraft {
-  return {
-    ...draft,
-    editorDocument: cloneEditorDocument(draft.editorDocument),
-  }
-}
-
-function getDraftStateSignature(draft: TemplateDraft) {
-  return JSON.stringify({
-    name: draft.name,
-    subject: draft.subject,
-    status: draft.status,
-    mjmlBody: draft.mjmlBody,
     editorDocument: draft.editorDocument,
   })
 }
@@ -171,6 +159,7 @@ function App() {
   const previewRenderRequestIdRef = useRef(0)
   const [selectedTemplate, setSelectedTemplate] = useState<TemplateDto | null>(null)
   const [draft, setDraft] = useState<TemplateDraft | null>(null)
+  const [savedDraftStateSignature, setSavedDraftStateSignature] = useState<string | null>(null)
   const [draftHistoryPast, setDraftHistoryPast] = useState<TemplateDraft[]>([])
   const [draftHistoryFuture, setDraftHistoryFuture] = useState<TemplateDraft[]>([])
   const [search, setSearch] = useState('')
@@ -273,19 +262,10 @@ function App() {
     [templates]
   )
 
-  const hasUnsavedChanges = useMemo(() => {
-    if (!selectedTemplate || !draft) {
-      return false
-    }
-
-    return (
-      selectedTemplate.name !== draft.name
-      || selectedTemplate.subject !== draft.subject
-      || selectedTemplate.status !== draft.status
-      || selectedTemplate.mjmlBody !== draft.mjmlBody
-      || serializeEditorDocument(selectedTemplate.editorDocument ?? null) !== serializeEditorDocument(draft.editorDocument)
-    )
-  }, [draft, selectedTemplate])
+  const hasUnsavedChanges = useMemo(
+    () => hasPersistedDraftChanges(savedDraftStateSignature, draft),
+    [draft, savedDraftStateSignature],
+  )
 
   const setActiveTenant = useCallback((nextTenantId: string) => {
     tenantIdRef.current = nextTenantId
@@ -597,6 +577,7 @@ function App() {
 
         setSelectedTemplate(response)
         resetDraftState(toDraft(response))
+        setSavedDraftStateSignature(getTemplateDraftStateSignature(response))
         setErrorMessage(null)
       } catch (error) {
         if (!isActive || handleUnauthorized(error)) {
@@ -697,6 +678,7 @@ function App() {
 
   function resetDraftState(nextDraft: TemplateDraft | null) {
     setDraft(nextDraft)
+    setSavedDraftStateSignature(nextDraft ? getDraftStateSignature(nextDraft) : null)
     setDraftHistoryPast([])
     setDraftHistoryFuture([])
   }
@@ -1405,7 +1387,7 @@ function App() {
 
   async function handleRenderPreview() {
     if (!tenantId || !draft) {
-      return
+      return false
     }
 
     const requestId = ++previewRenderRequestIdRef.current
@@ -1421,13 +1403,16 @@ function App() {
       setRenderIssues(response.issues)
       setPreviewMjmlSnapshot(previewSignature)
       setErrorMessage(null)
+      setInfoMessage(null)
+      return true
     } catch (error) {
       if (handleUnauthorized(error)) {
-        return
+        return false
       }
 
       resetPreview()
       setErrorMessage(getErrorMessage(error, 'Unable to render MJML preview.'))
+      return false
     } finally {
       if (requestId === previewRenderRequestIdRef.current) {
         setIsRenderingPreview(false)
@@ -1440,6 +1425,7 @@ function App() {
 
     setSelectedTemplate(updated)
     resetDraftState(nextDraft)
+    setSavedDraftStateSignature(getTemplateDraftStateSignature(updated))
     setTemplates((current) =>
       current.map((template) => (template.id === updated.id ? toSummary(updated) : template))
     )
@@ -1451,16 +1437,19 @@ function App() {
     }
   }
 
-  function handleOpenPreviewModal() {
-    if (!renderedHtml) {
-      setInfoMessage('Render a preview first, then open the expanded preview.')
-      setErrorMessage(null)
-      return
+  async function handleOpenPreviewModal() {
+    if (!renderedHtml || isPreviewStale) {
+      const previewRendered = await handleRenderPreview()
+
+      if (!previewRendered) {
+        return
+      }
     }
 
     setPreviewViewport('desktop')
     setIsPreviewModalOpen(true)
     setErrorMessage(null)
+    setInfoMessage(null)
   }
 
   function handleOpenPreviewInBrowser() {
@@ -1698,8 +1687,8 @@ function App() {
 
   if (!isAuthLoading && currentUser && isEditorRoute) {
     return (
-      <div className="min-h-screen bg-slate-950 text-slate-100">
-        <div className="mx-auto flex min-h-screen max-w-[1800px] flex-col">
+      <div className="min-h-screen bg-slate-950 text-slate-100 xl:h-screen xl:overflow-hidden">
+        <div className="mx-auto flex min-h-screen max-w-[1800px] flex-col xl:h-screen">
           <header className="border-b border-white/10 bg-slate-950/90 px-6 py-5 backdrop-blur lg:px-8">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex flex-wrap items-center gap-3">
@@ -1721,22 +1710,13 @@ function App() {
               </div>
 
               <div className="flex flex-wrap gap-3">
-                <label className="flex items-center gap-2 rounded-xl border border-white/10 bg-slate-900/60 px-3 py-2 text-sm text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={isAutoPreviewEnabled}
-                    onChange={(event) => setIsAutoPreviewEnabled(event.target.checked)}
-                    className="h-4 w-4 rounded border-white/20 bg-slate-950 text-sky-400 focus:ring-sky-400/40"
-                  />
-                  Auto refresh preview
-                </label>
                 <button
                   type="button"
-                  onClick={() => void handleRenderPreview()}
+                  onClick={() => void handleOpenPreviewModal()}
                   disabled={!draft || isRenderingPreview}
                   className="rounded-xl border border-sky-400/30 bg-sky-500/10 px-4 py-2 text-sm font-medium text-sky-100 transition hover:border-sky-300/50 hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:border-white/10 disabled:bg-slate-800 disabled:text-slate-500"
                 >
-                  {isRenderingPreview ? 'Rendering…' : 'Render preview'}
+                  {isRenderingPreview ? 'Opening preview…' : 'Preview'}
                 </button>
                 <button
                   type="button"
@@ -1770,234 +1750,76 @@ function App() {
             )}
           </header>
 
-          <main className="flex-1 px-6 py-6 lg:px-8">
+          <main className="flex-1 px-6 py-6 lg:px-8 xl:min-h-0 xl:overflow-hidden">
             {selectedTemplate && draft ? (
-              <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)_380px]">
-                <BuilderSidebar
-                  draft={draft}
-                  activeBuilderTab={activeBuilderTab}
-                  setActiveBuilderTab={setActiveBuilderTab}
-                  selectedSection={selectedSection}
-                  selectedColumn={selectedColumn}
-                  selectedBlock={selectedBlock}
-                  selectedSectionId={currentSelectedSectionId}
-                  selectedColumnId={currentSelectedColumnId}
-                  selectedBlockId={currentSelectedBlockId}
-                  handleAddBlock={handleAddBlock}
-                  handlePaletteBlockDragStart={handlePaletteBlockDragStart}
-                  handleAddSection={handleAddSection}
-                  handleAddPresetSection={handleAddPresetSection}
-                  handleUpdateSection={handleUpdateSection}
-                  handleUpdateSelectedColumn={handleUpdateSelectedColumn}
-                  handleUpdateSelectedColumnWidth={handleUpdateSelectedColumnWidth}
-                  handleUpdateSelectedBlock={handleUpdateSelectedBlock}
-                  handleAddSelectedBlockItem={handleAddSelectedBlockItem}
-                  handleUpdateSelectedBlockItem={handleUpdateSelectedBlockItem}
-                  handleRemoveSelectedBlockItem={handleRemoveSelectedBlockItem}
-                  handleSelectSection={handleSelectSection}
-                  handleSelectColumn={handleSelectColumn}
-                  handleSelectBlock={handleSelectBlock}
-                  handleStartBuilder={handleStartBuilder}
-                  clearDragState={clearDragState}
-                />
+              <div className="grid gap-6 xl:h-full xl:min-h-0 xl:grid-cols-[340px_minmax(0,1fr)]">
+                <div className="xl:min-h-0">
+                  <BuilderSidebar
+                    draft={draft}
+                    activeBuilderTab={activeBuilderTab}
+                    setActiveBuilderTab={setActiveBuilderTab}
+                    selectedSection={selectedSection}
+                    selectedColumn={selectedColumn}
+                    selectedBlock={selectedBlock}
+                    selectedSectionId={currentSelectedSectionId}
+                    selectedColumnId={currentSelectedColumnId}
+                    selectedBlockId={currentSelectedBlockId}
+                    handleAddBlock={handleAddBlock}
+                    handlePaletteBlockDragStart={handlePaletteBlockDragStart}
+                    handleAddSection={handleAddSection}
+                    handleAddPresetSection={handleAddPresetSection}
+                    handleUpdateSection={handleUpdateSection}
+                    handleUpdateSelectedColumn={handleUpdateSelectedColumn}
+                    handleUpdateSelectedColumnWidth={handleUpdateSelectedColumnWidth}
+                    handleUpdateSelectedBlock={handleUpdateSelectedBlock}
+                    handleAddSelectedBlockItem={handleAddSelectedBlockItem}
+                    handleUpdateSelectedBlockItem={handleUpdateSelectedBlockItem}
+                    handleRemoveSelectedBlockItem={handleRemoveSelectedBlockItem}
+                    handleSelectSection={handleSelectSection}
+                    handleSelectColumn={handleSelectColumn}
+                    handleSelectBlock={handleSelectBlock}
+                    handleStartBuilder={handleStartBuilder}
+                    clearDragState={clearDragState}
+                  />
+                </div>
 
-                <BuilderCanvas
-                  draft={draft}
-                  selectedSectionId={currentSelectedSectionId}
-                  selectedColumnId={currentSelectedColumnId}
-                  selectedBlockId={currentSelectedBlockId}
-                  draggedSectionId={draggedSectionId}
-                  draggedBlock={draggedBlock}
-                  sectionDropTargetId={sectionDropTargetId}
-                  columnDropTargetId={columnDropTargetId}
-                  blockDropTargetId={blockDropTargetId}
-                  handleSelectSection={handleSelectSection}
-                  handleSelectColumn={handleSelectColumn}
-                  handleSelectBlock={handleSelectBlock}
-                  handleSectionDragStart={handleSectionDragStart}
-                  handleSectionDrop={handleSectionDrop}
-                  handleBlockDragStart={handleBlockDragStart}
-                  handleBlockDropOnColumn={handleBlockDropOnColumn}
-                  handleBlockDropOnBlock={handleBlockDropOnBlock}
-                  setSectionDropTargetId={setSectionDropTargetId}
-                  setColumnDropTargetId={setColumnDropTargetId}
-                  setBlockDropTargetId={setBlockDropTargetId}
-                  clearDragState={clearDragState}
-                  handleStartBuilder={handleStartBuilder}
-                  handleAddSection={handleAddSection}
-                  handleDuplicateSection={handleDuplicateSection}
-                  handleDeleteSection={handleDeleteSection}
-                  handleDuplicateBlock={handleDuplicateBlock}
-                  handleDeleteBlock={handleDeleteBlock}
-                  canUndo={canUndoBuilderChange}
-                  canRedo={canRedoBuilderChange}
-                  handleUndo={handleUndoBuilderChange}
-                  handleRedo={handleRedoBuilderChange}
-                  handleUpdateSelectedBlock={handleUpdateSelectedBlock}
-                />
+                <div className="xl:min-h-0 xl:overflow-y-auto xl:pr-2">
+                  <BuilderCanvas
+                    draft={draft}
+                    selectedSectionId={currentSelectedSectionId}
+                    selectedColumnId={currentSelectedColumnId}
+                    selectedBlockId={currentSelectedBlockId}
+                    draggedSectionId={draggedSectionId}
+                    draggedBlock={draggedBlock}
+                    sectionDropTargetId={sectionDropTargetId}
+                    columnDropTargetId={columnDropTargetId}
+                    blockDropTargetId={blockDropTargetId}
+                    handleSelectSection={handleSelectSection}
+                    handleSelectColumn={handleSelectColumn}
+                    handleSelectBlock={handleSelectBlock}
+                    handleSectionDragStart={handleSectionDragStart}
+                    handleSectionDrop={handleSectionDrop}
+                    handleBlockDragStart={handleBlockDragStart}
+                    handleBlockDropOnColumn={handleBlockDropOnColumn}
+                    handleBlockDropOnBlock={handleBlockDropOnBlock}
+                    setSectionDropTargetId={setSectionDropTargetId}
+                    setColumnDropTargetId={setColumnDropTargetId}
+                    setBlockDropTargetId={setBlockDropTargetId}
+                    clearDragState={clearDragState}
+                    handleStartBuilder={handleStartBuilder}
+                    handleAddSection={handleAddSection}
+                    handleDuplicateSection={handleDuplicateSection}
+                    handleDeleteSection={handleDeleteSection}
+                    handleDuplicateBlock={handleDuplicateBlock}
+                    handleDeleteBlock={handleDeleteBlock}
+                    canUndo={canUndoBuilderChange}
+                    canRedo={canRedoBuilderChange}
+                    handleUndo={handleUndoBuilderChange}
+                    handleRedo={handleRedoBuilderChange}
+                    handleUpdateSelectedBlock={handleUpdateSelectedBlock}
+                  />
+                </div>
 
-                <aside className="space-y-6">
-                  <div className="rounded-[28px] border border-white/10 bg-slate-900/50 p-6 shadow-2xl shadow-black/20">
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                      HTML preview
-                    </p>
-                    <p className="mt-2 text-sm text-slate-400">
-                      Render the current builder layout or MJML fallback through the backend conversion service.
-                    </p>
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        onClick={handleOpenPreviewModal}
-                        disabled={!renderedHtml || isRenderingPreview}
-                        className="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/5 disabled:cursor-not-allowed disabled:border-white/5 disabled:text-slate-500"
-                      >
-                        Expand preview
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleOpenPreviewInBrowser}
-                        disabled={!renderedHtml || isRenderingPreview}
-                        className="rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/5 disabled:cursor-not-allowed disabled:border-white/5 disabled:text-slate-500"
-                      >
-                        Open in browser
-                      </button>
-                    </div>
-
-                    <div className="mt-4 overflow-hidden rounded-3xl border border-white/10 bg-white">
-                      {isRenderingPreview ? (
-                        <PreviewSkeleton />
-                      ) : renderedHtml ? (
-                        <iframe
-                          title="MJML HTML preview"
-                          srcDoc={renderedHtml}
-                          sandbox=""
-                          className="min-h-[420px] w-full bg-white"
-                        />
-                      ) : (
-                        <div className="flex min-h-[220px] items-center justify-center bg-slate-950/95 px-6 text-center">
-                          <div>
-                            <p className="text-base font-medium text-white">Preview not rendered yet</p>
-                            <p className="mt-2 text-sm text-slate-400">
-                              Run the renderer to see the current template draft as email HTML.
-                            </p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-4 rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3 text-sm text-slate-300">
-                      <span className="font-semibold text-white">{renderIssues.length}</span>
-                      {' '}
-                      render issue{renderIssues.length === 1 ? '' : 's'}
-                      {isPreviewStale && (
-                        <span className="ml-2 text-amber-200">for the last rendered draft</span>
-                      )}
-                      {isAutoPreviewEnabled && (
-                        <span className="ml-2 text-sky-200">auto refresh on</span>
-                      )}
-                    </div>
-
-                    {renderIssues.length > 0 && (
-                      <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4">
-                        <p className="text-sm font-semibold text-amber-100">Render feedback</p>
-                        <ul className="mt-3 space-y-2 text-sm text-amber-50/90">
-                          {renderIssues.map((issue, index) => (
-                            <li key={`${issue.type}-${issue.message}-${index}`} className="rounded-2xl bg-black/10 px-3 py-2">
-                              <span className="font-semibold text-amber-100">{issue.type}</span>
-                              {' '}
-                              {issue.message}
-                              {formatIssueLocation(issue) && (
-                                <span className="ml-2 text-xs text-amber-200/80">
-                                  {formatIssueLocation(issue)}
-                                </span>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="rounded-[28px] border border-white/10 bg-slate-900/50 p-6 shadow-2xl shadow-black/20">
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                      MJML snapshot
-                    </p>
-                    <p className="mt-2 text-sm text-slate-400">
-                      {draft.editorDocument
-                        ? 'This is the last saved MJML snapshot. Unsaved canvas changes render correctly in preview, but the stored MJML updates when you save.'
-                        : 'This template is still using raw MJML as its primary source.'}
-                    </p>
-                    <textarea
-                      value={draft.mjmlBody}
-                      readOnly
-                      className="mt-4 min-h-[220px] w-full rounded-3xl border border-white/10 bg-slate-950/90 px-4 py-4 font-mono text-sm leading-6 text-slate-100 outline-none"
-                    />
-                  </div>
-
-                  <div className="rounded-[28px] border border-white/10 bg-slate-900/50 p-6 shadow-2xl shadow-black/20">
-                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                      Revision history
-                    </p>
-                    <div className="mt-4 space-y-3">
-                      {hasUnsavedChanges && (
-                        <p className="rounded-2xl border border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                          Save or publish the current draft before rolling back to a stored revision.
-                        </p>
-                      )}
-                      {isRevisionsLoading ? (
-                        <div className="space-y-3">
-                          {[1, 2, 3].map((value) => (
-                            <div
-                              key={value}
-                              className="h-24 animate-pulse rounded-2xl border border-white/10 bg-slate-950/50"
-                            />
-                          ))}
-                        </div>
-                      ) : revisions.length === 0 ? (
-                        <p className="rounded-2xl border border-dashed border-white/10 px-4 py-6 text-sm text-slate-400">
-                          No revisions available yet.
-                        </p>
-                      ) : (
-                        revisions.map((revision) => (
-                          <div
-                            key={revision.id}
-                            className="rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-4"
-                          >
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className="text-sm font-semibold text-white">
-                                    Revision {revision.revisionNumber}
-                                  </span>
-                                  <span className="rounded-full border border-white/10 px-2.5 py-1 text-[11px] font-semibold text-slate-300">
-                                    {revision.eventType}
-                                  </span>
-                                  {revision.isPublishedRevision && (
-                                    <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-200">
-                                      Live
-                                    </span>
-                                  )}
-                                </div>
-                                <p className="mt-2 text-sm text-slate-300">{revision.subject}</p>
-                                <p className="mt-1 text-xs text-slate-500">
-                                  {formatTimestamp(revision.createdAtUtc)}
-                                </p>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => void handleRollbackTemplate(revision.id)}
-                                disabled={hasUnsavedChanges || isSaving || isPublishing || isRollingBackRevisionId === revision.id}
-                                className="rounded-xl border border-white/10 px-3 py-2 text-xs font-medium text-slate-200 transition hover:border-white/20 hover:bg-white/5 disabled:cursor-not-allowed disabled:border-white/5 disabled:text-slate-500"
-                              >
-                                {isRollingBackRevisionId === revision.id ? 'Rolling back…' : 'Rollback'}
-                              </button>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </aside>
               </div>
             ) : (
                   <div className="rounded-[28px] border border-dashed border-white/10 bg-slate-900/40 px-6 py-12 text-center">

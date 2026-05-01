@@ -10,6 +10,9 @@ public static class EmailTemplateValidation
     public const int SubjectMaxLength = 200;
     public const int MjmlBodyMaxLength = 100_000;
 
+    /// <summary>
+    /// Validates a create request before the application layer builds the domain template.
+    /// </summary>
     public static ValidationResult ValidateCreate(CreateEmailTemplateRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -17,6 +20,9 @@ public static class EmailTemplateValidation
         return ValidateCore(request.Name, request.Subject, request.MjmlBody, request.EditorDocument);
     }
 
+    /// <summary>
+    /// Validates an update request, including the requested template status transition.
+    /// </summary>
     public static ValidationResult ValidateUpdate(UpdateEmailTemplateRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
@@ -74,6 +80,7 @@ public static class EmailTemplateValidation
 
         if (string.IsNullOrWhiteSpace(mjmlBody))
         {
+            // Builder-backed templates regenerate MJML from editorDocument, so an empty raw body is valid in that mode.
             if (!allowEmptyWhenEditorDocumentPresent)
             {
                 errors.Add(new ValidationError(nameof(CreateEmailTemplateRequest.MjmlBody), "MjmlBody is required."));

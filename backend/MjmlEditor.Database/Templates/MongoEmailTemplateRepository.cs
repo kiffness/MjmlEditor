@@ -69,6 +69,7 @@ internal sealed class MongoEmailTemplateRepository : IEmailTemplateRepository
     {
         var status = Enum.Parse<EmailTemplateStatus>(document.Status, ignoreCase: true);
         var revisions = document.Revisions.Count == 0
+            // Older documents predate revision tracking, so we synthesize an initial revision during hydration.
             ? [CreateLegacyRevision(document, status)]
             : document.Revisions
                 .Select(revision => EmailTemplateRevision.Restore(
@@ -83,6 +84,7 @@ internal sealed class MongoEmailTemplateRepository : IEmailTemplateRepository
                     DateTime.SpecifyKind(revision.CreatedAtUtc, DateTimeKind.Utc),
                     revision.EditorDocument is null ? null : MapToDomain(revision.EditorDocument)))
                 .ToArray();
+        // Legacy published documents may not have a stored PublishedRevisionId, so fall back to the latest hydrated revision.
         var publishedRevisionId = string.IsNullOrWhiteSpace(document.PublishedRevisionId) && status == EmailTemplateStatus.Published
             ? revisions[^1].Id
             : document.PublishedRevisionId;

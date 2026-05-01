@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/backend/">
     <Project Path="backend/MjmlEditor.Api/MjmlEditor.Api.csproj" />
+    <Project Path="backend/MjmlEditor.Application.Tests/MjmlEditor.Application.Tests.csproj" />
     <Project Path="backend/MjmlEditor.Application/MjmlEditor.Application.csproj" />
     <Project Path="backend/MjmlEditor.Database/MjmlEditor.Database.csproj" />
     <Project Path="backend/MjmlEditor.Domain/MjmlEditor.Domain.csproj" />

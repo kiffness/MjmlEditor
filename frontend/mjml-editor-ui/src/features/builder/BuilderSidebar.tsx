@@ -367,8 +367,8 @@ export function BuilderSidebar({
   const hasBuilderDocument = draft.editorDocument !== null
 
   return (
-    <aside className="space-y-6 self-start xl:sticky xl:top-6">
-      <div className="rounded-[28px] border border-white/10 bg-slate-900/50 p-5 shadow-2xl shadow-black/20">
+    <aside className="self-start xl:flex xl:h-full xl:min-h-0">
+      <div className="rounded-[28px] border border-white/10 bg-slate-900/50 p-5 shadow-2xl shadow-black/20 xl:flex xl:h-full xl:min-h-0 xl:flex-1 xl:flex-col">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
           Builder tools
         </p>
@@ -392,7 +392,10 @@ export function BuilderSidebar({
           ))}
         </div>
 
-        <div className="mt-5">
+        <div
+          data-testid="builder-sidebar-scroll-region"
+          className="mt-5 xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:pr-1"
+        >
           {activeBuilderTab === 'blocks' && (
             <div className="space-y-4">
               <p className="text-xs text-slate-400">
