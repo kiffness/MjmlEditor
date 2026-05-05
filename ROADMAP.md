@@ -58,6 +58,7 @@ Completed after `v1`:
 - advanced style controls (typography, spacing, surfaces, media, brand library)
 - explodable presets and preset internal layout controls
 - RTE link text preserved in backend-rendered preview (stale-draft race condition fixed)
+- R2 image upload with in-browser crop modal (react-easy-crop, CORS proxy, aspect presets)
 
 ## Roadmap principles
 
@@ -101,6 +102,7 @@ Immediate execution order:
 3. ~~Add rich text editing.~~
 4. ~~Add brand library page.~~
 5. ~~Add saved sections library.~~
+6. ~~Add R2 image upload with in-browser crop.~~
 
 Documentation and tests should now be updated continuously as new features and architectural changes land.
 
@@ -121,6 +123,10 @@ Standalone brand library page with live preview. Clients can manage brand colors
 ### ~~6. Add saved sections library~~ ✓
 
 Allow clients to save a section from one template and reuse it in other templates with the same structure and styling. Linked sections are locked in the canvas and must be edited through a dedicated sub-canvas that offers "Apply to all templates" or "Apply to this template only".
+
+### ~~7. Add R2 image upload with in-browser crop~~ ✓
+
+Images can be uploaded directly from the block sidebar to Cloudflare R2. An in-browser crop modal (react-easy-crop) lets users crop before upload, with aspect-ratio presets and zoom controls. The backend proxy endpoint sidesteps browser CORS restrictions when drawing remote images to canvas.
 
 ## Notes
 

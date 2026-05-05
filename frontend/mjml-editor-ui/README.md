@@ -20,8 +20,14 @@ The frontend is a React + TypeScript application that provides the template libr
 ### Builder files
 
 - `src\features\builder\builderModel.ts` - shared builder model, palette metadata, defaults, presets, and pure helpers
-- `src\features\builder\BuilderSidebar.tsx` - sidebar tabs for blocks, sections, presets, styles, and layers
+- `src\features\builder\BuilderSidebar.tsx` - sidebar tabs for blocks, sections, presets, styles, and layers; image upload and crop controls
 - `src\features\builder\BuilderCanvas.tsx` - canvas rendering, block previews, drag/drop targets, undo/redo controls, and inline editing
+- `src\features\builder\ImageCropModal.tsx` - in-browser crop modal built on react-easy-crop; uploads the cropped result to R2 on confirm
+- `src\features\builder\LinkedSectionEditor.tsx` - sub-canvas for editing saved sections with apply-to-all vs apply-here semantics
+
+### Other feature files
+
+- `src\features\brandlibrary\BrandLibraryPage.tsx` - brand library editor (colors, typography, button styles) with a live email preview panel
 
 ## UI model
 
@@ -47,6 +53,10 @@ The builder currently supports:
 - inline editing for key text content
 - presets and block palette browsing
 - layers navigation
+- rich text editing (Tiptap) for text-oriented blocks
+- saved sections library with linked editing (apply to all vs apply here)
+- brand library with live preview
+- image upload to Cloudflare R2 with in-browser crop (react-easy-crop)
 
 ## Local development
 

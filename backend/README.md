@@ -8,7 +8,7 @@ The backend is an ASP.NET Core minimal API that stores templates in MongoDB and 
 - `MjmlEditor.Application` - services, validation, DTO mapping, rendering orchestration, and MJML generation
 - `MjmlEditor.Domain` - template, editor-document, revision, tenancy, and user domain models
 - `MjmlEditor.Database` - MongoDB repositories and document mapping
-- `MjmlEditor.Infrastructure` - auth, tenancy, exception handling, MJML renderer integration, and dependency wiring
+- `MjmlEditor.Infrastructure` - auth, tenancy, exception handling, MJML renderer integration, R2/S3 media upload, and dependency wiring
 - `MjmlEditor.Seed` - local seed utility for tenants/users/templates
 
 ## Request flow
@@ -25,6 +25,15 @@ For template editing and previewing, the usual flow is:
 When `editorDocument` is present, the service regenerates canonical MJML from the document instead of trusting the incoming MJML body.
 
 ## Important backend concepts
+
+### Media upload and image proxy
+
+Image upload and crop are handled by `MjmlEditor.Api\Endpoints\MediaEndpoints.cs`:
+
+- `POST /api/media/upload` — accepts a multipart form file, uploads it to Cloudflare R2 via `IMediaUploadService`, and returns the public CDN URL. Requires authentication.
+- `GET /api/media/proxy?url={url}` — fetches a remote image server-side and streams the bytes back to the browser. Used by the frontend crop modal to avoid browser CORS restrictions when drawing to canvas. Requires authentication.
+
+`IMediaUploadService` / `R2MediaUploadService` lives in `MjmlEditor.Infrastructure\Media\`. R2 credentials and bucket settings are read from `R2Options` and supplied via environment variables in `docker-compose.dev.yml` — they are never committed to `appsettings.json`.
 
 ### Tenancy
 

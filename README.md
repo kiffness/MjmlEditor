@@ -24,7 +24,7 @@ When an `editorDocument` is present, the backend treats it as the canonical sour
 - `MjmlEditor.Application` owns validation, DTO mapping, services, and MJML generation
 - `MjmlEditor.Domain` owns the core template/editor model and invariants
 - `MjmlEditor.Database` stores templates and revisions in MongoDB
-- `MjmlEditor.Infrastructure` provides auth, tenancy, rendering, diagnostics, and app wiring
+- `MjmlEditor.Infrastructure` provides auth, tenancy, rendering, diagnostics, R2/S3 media upload, and app wiring
 - `MjmlEditor.Seed` seeds local tenants/templates for development
 
 ### Frontend
@@ -32,8 +32,10 @@ When an `editorDocument` is present, the backend treats it as the canonical sour
 - `src\App.tsx` holds the main application flow, routes, data loading, and editor state
 - `src\lib\api.ts` defines the frontend API contract and request helpers
 - `src\features\builder\builderModel.ts` holds builder types, palette metadata, defaults, and pure helper logic
-- `src\features\builder\BuilderSidebar.tsx` contains block/style/layer editing UI
+- `src\features\builder\BuilderSidebar.tsx` contains block/style/layer editing UI, image upload, and crop controls
 - `src\features\builder\BuilderCanvas.tsx` renders the visual canvas, drag/drop interactions, and inline block editing
+- `src\features\builder\ImageCropModal.tsx` provides the in-browser crop UI (react-easy-crop) with R2 upload on confirm
+- `src\features\brandlibrary\BrandLibraryPage.tsx` provides the standalone brand library editor with live email preview
 
 ## Local development
 
