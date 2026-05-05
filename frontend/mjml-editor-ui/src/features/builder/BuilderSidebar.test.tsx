@@ -47,6 +47,7 @@ function createProps(overrides?: Partial<ComponentProps<typeof BuilderSidebar>>)
     savedSections: [],
     onInsertSavedSection: vi.fn(),
     onDeleteSavedSection: vi.fn(),
+    onUploadImage: vi.fn(),
     ...overrides,
   }
 }

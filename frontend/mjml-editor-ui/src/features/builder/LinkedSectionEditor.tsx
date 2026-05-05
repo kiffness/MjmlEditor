@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { SavedSectionDto } from '../../lib/api'
+import { uploadImage } from '../../lib/api'
 import type { EditorSection, EditorBlock, EditorBlockItem, EditorBlockType, EditorColumn, BrandColorDto } from '../../lib/api'
 import { BuilderCanvas } from './BuilderCanvas'
 import { BuilderSidebar } from './BuilderSidebar'
@@ -304,6 +305,7 @@ export function LinkedSectionEditor({
               savedSections={[]}
               onInsertSavedSection={() => { /* no nesting */ }}
               onDeleteSavedSection={() => { /* no-op */ }}
+              onUploadImage={(blob, fileName) => uploadImage(blob, fileName)}
             />
           </div>
           <div className="xl:min-h-0 xl:overflow-y-auto xl:pr-2">

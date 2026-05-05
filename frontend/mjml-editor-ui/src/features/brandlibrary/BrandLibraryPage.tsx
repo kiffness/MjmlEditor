@@ -178,10 +178,13 @@ function EmailPreview({ lib }: { lib: BrandLibraryDto }) {
 
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', maxWidth: '600px', margin: '0 auto', borderRadius: '12px', overflow: 'hidden', boxShadow: '0 4px 32px rgba(0,0,0,0.5)' }}>
-      <div style={{ backgroundColor: '#0f172a', padding: '20px 32px', textAlign: 'center' }}>
-        <span style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '3px', color: '#64748b', textTransform: 'uppercase' }}>
-          Estate Agent
-        </span>
+      <div style={{ backgroundColor: '#0f172a', padding: '20px 32px', textAlign: 'center', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        {lib.defaultLogoUrl
+          ? <img src={lib.defaultLogoUrl} alt={lib.defaultLogoAltText ?? 'Logo'} style={{ maxHeight: '48px', maxWidth: '200px', objectFit: 'contain' }} />
+          : <span style={{ fontSize: '13px', fontWeight: 700, letterSpacing: '3px', color: '#64748b', textTransform: 'uppercase' }}>
+              Estate Agent
+            </span>
+        }
       </div>
       <div style={{ backgroundColor: sectionBg, padding: '48px 40px 40px', textAlign: 'center' }}>
         <div style={{ marginBottom: '12px' }}>

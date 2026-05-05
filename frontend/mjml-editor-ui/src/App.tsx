@@ -29,6 +29,7 @@ import {
   renderMjml,
   rollbackTemplate,
   saveBrandLibrary,
+  uploadImage,
   type AuthenticatedUserDto,
   type MjmlRenderIssueDto,
   type SavedSectionDto,
@@ -1998,6 +1999,7 @@ function App() {
                     savedSections={savedSections}
                     onInsertSavedSection={handleInsertSavedSection}
                     onDeleteSavedSection={handleDeleteSavedSection}
+                    onUploadImage={(blob, fileName) => uploadImage(blob, fileName)}
                   />
                 </div>
 

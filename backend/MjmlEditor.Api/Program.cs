@@ -7,6 +7,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddApplication();
 builder.AddInfrastructure();
+builder.Services.AddHttpClient();
 builder.Services.AddOpenApi();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -35,5 +36,6 @@ app.MapTenantEndpoints();
 app.MapEmailTemplateEndpoints();
 app.MapBrandLibraryEndpoints();
 app.MapSavedSectionsEndpoints();
+app.MapMediaEndpoints();
 
 app.Run();

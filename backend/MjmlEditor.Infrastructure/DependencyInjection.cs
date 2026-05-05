@@ -7,11 +7,13 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 using MjmlEditor.Application.Auth;
+using MjmlEditor.Application.Media;
 using MjmlEditor.Application.Templates;
 using MjmlEditor.Application.Tenancy;
 using MjmlEditor.Database;
 using MjmlEditor.Infrastructure.Auth;
 using MjmlEditor.Infrastructure.Diagnostics;
+using MjmlEditor.Infrastructure.Media;
 using MjmlEditor.Infrastructure.Templates;
 using MjmlEditor.Infrastructure.Tenancy;
 using Serilog;
@@ -82,6 +84,12 @@ public static class DependencyInjection
             });
         builder.Services.AddAuthorization();
         builder.Services.AddSingleton<IMjmlRenderer, MjmlNetRenderer>();
+        builder.Services
+            .AddOptions<R2Options>()
+            .Bind(builder.Configuration.GetSection(R2Options.SectionName))
+            .ValidateDataAnnotations()
+            .ValidateOnStart();
+        builder.Services.AddScoped<IMediaUploadService, R2MediaUploadService>();
         builder.Services.AddCors(options =>
         {
             options.AddPolicy(FrontendCorsPolicy, policy =>

@@ -11,6 +11,11 @@ services:
       Serilog__WriteTo__1__Args__serverUrl: http://seq:5341
       Cors__AllowedOrigins__0: http://localhost:5173
       Cors__AllowedOrigins__1: http://127.0.0.1:5173
+      R2__AccountId: "ade7b4962ee6e1aa6a41a5638849ac1f"
+      R2__BucketName: "mjml-editor-media"
+      R2__AccessKeyId: "218980f8d53d684e5b4606a84ad79a11"
+      R2__SecretAccessKey: "9e038c5d4cbf261e29913198c48b2ddc4dae64ce51035d8affb6bac90fb7b41e"
+      R2__PublicBaseUrl: "https://pub-83d2048d82314d999e0f7ada3080a553.r2.dev"
     ports:
       - "5261:8080"
     volumes:

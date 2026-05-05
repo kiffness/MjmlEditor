@@ -288,6 +288,18 @@ export function getApiBaseUrl() {
   return apiBaseUrl
 }
 
+export async function uploadImage(blob: Blob, fileName: string): Promise<string> {
+  const formData = new FormData()
+  formData.append('file', blob, fileName)
+  const headers = new Headers()
+  const authToken = getStoredAuthToken()
+  if (authToken) headers.set('Authorization', `Bearer ${authToken}`)
+  const response = await fetch(`${apiBaseUrl}/api/media/upload`, { method: 'POST', headers, body: formData })
+  if (!response.ok) throw new ApiError(`Upload failed with status ${response.status}.`, response.status)
+  const { url } = await response.json() as { url: string }
+  return url
+}
+
 export function getStoredAuthToken() {
   return window.localStorage.getItem(authTokenStorageKey)
 }

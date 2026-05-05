@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react'
 import type {
   EditorAlignment,
   EditorBlock,
@@ -31,6 +32,7 @@ import {
   type TemplateDraft,
 } from './builderModel'
 import { ColorInput } from './ColorInput'
+import { ImageCropModal } from './ImageCropModal'
 import RichTextEditor from './RichTextEditor'
 
 type BlockItemsEditorProps = {
@@ -271,6 +273,7 @@ type BuilderSidebarProps = {
   savedSections: SavedSectionDto[]
   onInsertSavedSection: (savedSection: SavedSectionDto) => void
   onDeleteSavedSection: (id: string) => void
+  onUploadImage: (blob: Blob, fileName: string) => Promise<string>
 }
 
 export function BuilderSidebar({
@@ -303,10 +306,15 @@ export function BuilderSidebar({
   savedSections,
   onInsertSavedSection,
   onDeleteSavedSection,
+  onUploadImage,
 }: BuilderSidebarProps) {
   const hasBuilderDocument = draft.editorDocument !== null
+  // isBlob=true means objectUrl needs to be revoked on close
+  const [cropState, setCropState] = useState<{ imageUrl: string; fileName: string; isBlob: boolean } | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   return (
+    <>
     <aside className="self-start xl:flex xl:h-full xl:min-h-0">
       <div className="rounded-[28px] border border-white/10 bg-slate-900/50 p-5 shadow-2xl shadow-black/20 xl:flex xl:h-full xl:min-h-0 xl:flex-1 xl:flex-col">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
@@ -411,6 +419,44 @@ export function BuilderSidebar({
                             className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
                           />
                         </label>
+                        {/* Hidden file input for local image upload */}
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (!file) return
+                            const objectUrl = URL.createObjectURL(file)
+                            setCropState({ imageUrl: objectUrl, fileName: file.name, isBlob: true })
+                            e.target.value = ''
+                          }}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="flex flex-1 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a2 2 0 002 2h12a2 2 0 002-2v-1M12 12V4m0 0L8 8m4-4l4 4" />
+                            </svg>
+                            Upload &amp; Crop
+                          </button>
+                          {selectedBlock.imageUrl && (
+                            <button
+                              type="button"
+                              onClick={() => setCropState({ imageUrl: selectedBlock.imageUrl!, fileName: 'cropped.png', isBlob: false })}
+                              className="flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-medium text-slate-300 transition hover:bg-white/10 hover:text-white"
+                            >
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4" />
+                              </svg>
+                              Crop
+                            </button>
+                          )}
+                        </div>
                         <label className="block">
                           <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
                             Alt text
@@ -1252,5 +1298,21 @@ export function BuilderSidebar({
         </div>
       </div>
     </aside>
+    {cropState && (
+      <ImageCropModal
+        imageUrl={cropState.imageUrl}
+        onConfirm={async (blob) => {
+          const url = await onUploadImage(blob, cropState.fileName)
+          handleUpdateSelectedBlock({ imageUrl: url })
+          if (cropState.isBlob) URL.revokeObjectURL(cropState.imageUrl)
+          setCropState(null)
+        }}
+        onClose={() => {
+          if (cropState.isBlob) URL.revokeObjectURL(cropState.imageUrl)
+          setCropState(null)
+        }}
+      />
+    )}
+  </>
   )
 }
