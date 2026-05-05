@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using MjmlEditor.Application.Auth;
 using MjmlEditor.Application.BrandLibrary;
+using MjmlEditor.Application.SavedSections;
 using MjmlEditor.Application.Templates;
 using MjmlEditor.Application.Tenancy;
 
@@ -18,6 +19,7 @@ public static class DependencyInjection
         services.AddScoped<IMjmlTemplateService, MjmlTemplateService>();
         services.AddScoped<ITenantService, TenantService>();
         services.AddScoped<IBrandLibraryService, BrandLibraryService>();
+        services.AddScoped<ISavedSectionService, SavedSectionService>();
 
         return services;
     }

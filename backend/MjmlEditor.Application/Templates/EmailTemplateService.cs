@@ -3,6 +3,7 @@ using MjmlEditor.Application.Contracts.Validation;
 using MjmlEditor.Application.Auth;
 using MjmlEditor.Application.Exceptions;
 using MjmlEditor.Application.Tenancy;
+using MjmlEditor.Domain.BrandLibrary;
 using MjmlEditor.Domain.Templates;
 
 namespace MjmlEditor.Application.Templates;
@@ -11,7 +12,8 @@ internal sealed class EmailTemplateService(
     IEmailTemplateRepository repository,
     ICurrentUserAccessor currentUserAccessor,
     ITenantContextAccessor tenantContextAccessor,
-    IEmailTemplateMjmlGenerator mjmlGenerator) : IEmailTemplateService
+    IEmailTemplateMjmlGenerator mjmlGenerator,
+    IBrandLibraryRepository brandLibraryRepository) : IEmailTemplateService
 {
     public async Task<IReadOnlyList<EmailTemplateSummaryDto>> ListAsync(CancellationToken cancellationToken)
     {
@@ -38,7 +40,7 @@ internal sealed class EmailTemplateService(
         var actorUserId = currentUserAccessor.GetRequiredUserId();
         ValidateRequest(EmailTemplateValidation.ValidateCreate(request));
         var editorDocument = request.EditorDocument?.ToDomain();
-        var mjmlBody = BuildCanonicalMjml(request.MjmlBody, editorDocument);
+        var mjmlBody = await BuildCanonicalMjmlAsync(request.MjmlBody, editorDocument, tenantId, cancellationToken);
 
         var template = EmailTemplate.Create(
             Guid.NewGuid().ToString("N"),
@@ -75,7 +77,7 @@ internal sealed class EmailTemplateService(
 
         var now = DateTimeOffset.UtcNow;
         var editorDocument = request.EditorDocument?.ToDomain();
-        var mjmlBody = BuildCanonicalMjml(request.MjmlBody, editorDocument);
+        var mjmlBody = await BuildCanonicalMjmlAsync(request.MjmlBody, editorDocument, tenantId, cancellationToken);
 
         template.Save(
             request.Name,
@@ -179,11 +181,13 @@ internal sealed class EmailTemplateService(
         }
     }
 
-    private string BuildCanonicalMjml(string requestedMjmlBody, Domain.Templates.EmailTemplateEditorDocument? editorDocument)
+    private async Task<string> BuildCanonicalMjmlAsync(string requestedMjmlBody, Domain.Templates.EmailTemplateEditorDocument? editorDocument, string tenantId, CancellationToken cancellationToken)
     {
         // The visual builder is the source of truth whenever an editor document exists; raw MJML is only canonical in text mode.
-        return editorDocument is null
-            ? requestedMjmlBody.Trim()
-            : mjmlGenerator.Generate(editorDocument);
+        if (editorDocument is null)
+            return requestedMjmlBody.Trim();
+
+        var brandLibrary = await brandLibraryRepository.GetByTenantIdAsync(tenantId, cancellationToken);
+        return mjmlGenerator.Generate(editorDocument, brandLibrary?.DefaultLogoUrl);
     }
 }

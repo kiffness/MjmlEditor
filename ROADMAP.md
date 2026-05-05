@@ -57,6 +57,7 @@ Completed after `v1`:
   - Vitest coverage in the frontend
 - advanced style controls (typography, spacing, surfaces, media, brand library)
 - explodable presets and preset internal layout controls
+- RTE link text preserved in backend-rendered preview (stale-draft race condition fixed)
 
 ## Roadmap principles
 
@@ -97,8 +98,9 @@ Immediate execution order:
 
 1. ~~Expand advanced style controls.~~
 2. ~~Add explodable presets and improve preset internal layout controls.~~
-3. Add rich text editing.
-4. Add saved sections library.
+3. ~~Add rich text editing.~~
+4. ~~Add brand library page.~~
+5. ~~Add saved sections library.~~
 
 Documentation and tests should now be updated continuously as new features and architectural changes land.
 
@@ -108,30 +110,24 @@ Documentation and tests should now be updated continuously as new features and a
 
 ### ~~3. Improve preset internal layout controls~~ ✓
 
-### 4. Add rich text editing
+### ~~4. Add rich text editing~~ ✓
 
-Introduce an RTE-style editing experience for text-oriented blocks, as long as formatting stays MJML-safe and consistent across preview, persistence, and backend generation.
+Tiptap-based RTE for text-oriented blocks (Hero, Text, Footer, Badge, Quote). Formatting is MJML-safe and consistent across preview, persistence, and backend generation.
 
-### 5. Add saved sections library
+### ~~5. Add brand library page~~ ✓
 
-Allow clients to save a section from one template and reuse it in other templates with the same structure and styling.
+Standalone brand library page with live preview. Clients can manage brand colors, typography, and button styles, with changes reflected immediately across their templates.
 
-Key questions and goals:
+### ~~6. Add saved sections library~~ ✓
 
-- save a finished section as a reusable library item
-- insert saved sections into any of that client's templates
-- persist saved sections across templates as client-scoped reusable content
-- preserve section structure, block content, and styling defaults
-- when editing a saved section, offer a clear choice to apply the change only to the current template or to all templates using that saved section
-- decide when a saved section keeps its original styling versus inheriting newer brand-library defaults
-- make saved sections feel like accelerators for repeatable campaign patterns
+Allow clients to save a section from one template and reuse it in other templates with the same structure and styling. Linked sections are locked in the canvas and must be edited through a dedicated sub-canvas that offers "Apply to all templates" or "Apply to this template only".
 
 ## Notes
 
 - The older idea of reclassifying marketing blocks purely as presets is currently **not the chosen direction**. The current plan is to keep the section/column model central and make presets more flexible instead.
 - Future content should support token-style placeholders such as `{{ params.price }}` and similar dynamic values.
 - Brand-aware styling should prefer guided consistency over strict lock-in: show the brand-library options first, but still allow raw color picking and targeted overrides when needed.
-- The brand library should live on its own editor-accessible page and include a live preview so users can see brand changes reflected immediately.
+- The brand library lives on its own editor-accessible page with a live preview so users can see brand changes reflected immediately. ✓
 - Saved sections should eventually work as a client-scoped content library so commonly used layouts can be reused across templates without rebuilding them each time.
 - Saved-section editing should support both local changes and shared changes: update just this template instance or propagate the update to every template linked to the saved section.
 - Testing should exist in both stacks so future editor, validation, and rendering changes are safer to ship.

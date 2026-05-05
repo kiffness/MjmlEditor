@@ -10,7 +10,7 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
     /// <summary>
     /// Generates canonical MJML for the structured editor document.
     /// </summary>
-    public string Generate(EmailTemplateEditorDocument document)
+    public string Generate(EmailTemplateEditorDocument document, string? defaultLogoUrl = null)
     {
         ArgumentNullException.ThrowIfNull(document);
 
@@ -58,7 +58,7 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
 
                 foreach (var block in column.Blocks)
                 {
-                    builder.AppendLine(RenderBlock(block));
+                    builder.AppendLine(RenderBlock(block, defaultLogoUrl));
                 }
 
                 builder.AppendLine("      </mj-column>");
@@ -73,7 +73,7 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
         return builder.ToString();
     }
 
-    private static string RenderBlock(EmailTemplateEditorBlock block)
+    private static string RenderBlock(EmailTemplateEditorBlock block, string? defaultLogoUrl = null)
     {
         return block.Type switch
         {
@@ -83,7 +83,7 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
             EmailTemplateEditorBlockType.Button => RenderButtonBlock(block),
             EmailTemplateEditorBlockType.Spacer => RenderSpacerBlock(block),
             EmailTemplateEditorBlockType.Divider => RenderDividerBlock(block),
-            EmailTemplateEditorBlockType.Logo => RenderLogoBlock(block),
+            EmailTemplateEditorBlockType.Logo => RenderLogoBlock(block, defaultLogoUrl),
             EmailTemplateEditorBlockType.SocialLinks => RenderLinksBlock(block, inlineByDefault: true, defaultAlignment: EmailTemplateEditorAlignment.Center),
             EmailTemplateEditorBlockType.Footer => RenderFooterBlock(block),
             EmailTemplateEditorBlockType.LinkList => RenderLinksBlock(block, inlineByDefault: false, defaultAlignment: EmailTemplateEditorAlignment.Left),
@@ -131,11 +131,12 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
         return builder.ToString();
     }
 
-    private static string RenderLogoBlock(EmailTemplateEditorBlock block)
+    private static string RenderLogoBlock(EmailTemplateEditorBlock block, string? defaultLogoUrl = null)
     {
         var builder = new StringBuilder();
         builder.Append("        <mj-image");
-        builder.Append($" src=\"{EncodeAttribute(block.ImageUrl ?? string.Empty)}\"");
+        var src = string.IsNullOrWhiteSpace(block.ImageUrl) ? (defaultLogoUrl ?? string.Empty) : block.ImageUrl;
+        builder.Append($" src=\"{EncodeAttribute(src)}\"");
         builder.Append(block.WidthPercentage is not null ? $" width=\"{block.WidthPercentage.Value}%\"" : " width=\"140px\"");
 
         if (!string.IsNullOrWhiteSpace(block.AltText))
@@ -541,6 +542,7 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
         sanitizer.AllowedTags.Add("a");
         sanitizer.AllowedTags.Add("br");
         sanitizer.AllowedTags.Add("p");
+        sanitizer.AllowedTags.Add("span");
         sanitizer.AllowedAttributes.Clear();
         sanitizer.AllowedAttributes.Add("href");
         sanitizer.AllowedAttributes.Add("target");
@@ -565,6 +567,7 @@ internal sealed class EmailTemplateMjmlGenerator : IEmailTemplateMjmlGenerator
         sanitizer.AllowedTags.Add("em");
         sanitizer.AllowedTags.Add("u");
         sanitizer.AllowedTags.Add("a");
+        sanitizer.AllowedTags.Add("span");
         sanitizer.AllowedAttributes.Clear();
         sanitizer.AllowedAttributes.Add("href");
         sanitizer.AllowedAttributes.Add("target");

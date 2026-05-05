@@ -32,7 +32,7 @@ internal sealed class BrandLibraryService(
                 dto.ButtonStyle.FontSize,
                 dto.ButtonStyle.FontWeight);
 
-        var library = Domain.BrandLibrary.BrandLibrary.Create(tenantId, dto.SectionDefaultBackgroundColor, colors, headingStyles, textStyles, buttonStyle);
+        var library = Domain.BrandLibrary.BrandLibrary.Create(tenantId, dto.SectionDefaultBackgroundColor, dto.DefaultLogoUrl, dto.DefaultLogoAltText, colors, headingStyles, textStyles, buttonStyle);
         await repository.UpsertAsync(library, cancellationToken);
         return MapToDto(library);
     }
@@ -41,6 +41,8 @@ internal sealed class BrandLibraryService(
         new()
         {
             SectionDefaultBackgroundColor = library.SectionDefaultBackgroundColor,
+            DefaultLogoUrl = library.DefaultLogoUrl,
+            DefaultLogoAltText = library.DefaultLogoAltText,
             Colors = library.Colors.Select(c => new BrandColorDto { Name = c.Name, Value = c.Value }).ToArray(),
             HeadingStyles = library.HeadingStyles.Select(h => new BrandHeadingStyleDto
             {

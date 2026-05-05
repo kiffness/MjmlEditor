@@ -281,6 +281,36 @@ export function BrandLibraryPage({ library, onSave, onBack }: BrandLibraryPagePr
               </Field>
             </Section>
 
+            <Section title="Default Logo">
+              <Field label="Logo URL">
+                <input
+                  type="url"
+                  value={lib.defaultLogoUrl ?? ''}
+                  onChange={(e) => setLib({ ...lib, defaultLogoUrl: e.target.value || null })}
+                  placeholder="https://example.com/logo.png"
+                  className={inputCls}
+                />
+              </Field>
+              {lib.defaultLogoUrl && (
+                <div className="mb-3 flex items-center justify-center rounded-xl border border-white/10 bg-slate-900/40 p-4">
+                  <img
+                    src={lib.defaultLogoUrl}
+                    alt={lib.defaultLogoAltText ?? 'Brand logo'}
+                    className="max-h-16 max-w-[180px] object-contain"
+                  />
+                </div>
+              )}
+              <Field label="Alt Text">
+                <input
+                  type="text"
+                  value={lib.defaultLogoAltText ?? ''}
+                  onChange={(e) => setLib({ ...lib, defaultLogoAltText: e.target.value || null })}
+                  placeholder="Company logo"
+                  className={inputCls}
+                />
+              </Field>
+            </Section>
+
             <Section title="Heading Styles">
               {HEADING_LEVELS.map((level) => (
                 <HeadingEditor key={level} lib={lib} level={level} onChange={setLib} />

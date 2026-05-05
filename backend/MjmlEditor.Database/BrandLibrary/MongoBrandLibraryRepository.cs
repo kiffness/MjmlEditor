@@ -30,6 +30,8 @@ internal sealed class MongoBrandLibraryRepository(
         return Domain.BrandLibrary.BrandLibrary.Restore(
             doc.TenantId,
             doc.SectionDefaultBackgroundColor,
+            doc.DefaultLogoUrl,
+            doc.DefaultLogoAltText,
             doc.Colors.Select(c => BrandColor.Restore(c.Name, c.Value)).ToArray(),
             doc.HeadingStyles.Select(h => BrandHeadingStyle.Restore(h.Level, h.FontFamily, h.FontSize, h.FontWeight, h.Color)).ToArray(),
             doc.TextStyles.Select(t => BrandTextStyle.Restore(t.Name, t.FontFamily, t.FontSize, t.FontWeight, t.Color)).ToArray(),
@@ -48,6 +50,8 @@ internal sealed class MongoBrandLibraryRepository(
         {
             TenantId = library.TenantId,
             SectionDefaultBackgroundColor = library.SectionDefaultBackgroundColor,
+            DefaultLogoUrl = library.DefaultLogoUrl,
+            DefaultLogoAltText = library.DefaultLogoAltText,
             Colors = library.Colors.Select(c => new BrandColorDocument { Name = c.Name, Value = c.Value }).ToArray(),
             HeadingStyles = library.HeadingStyles.Select(h => new BrandHeadingStyleDocument
             {

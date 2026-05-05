@@ -3,7 +3,11 @@ import { mergeAttributes } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import Underline from '@tiptap/extension-underline'
 import Link from '@tiptap/extension-link'
-import { useEffect, useState } from 'react'
+import { TextStyle } from '@tiptap/extension-text-style'
+import { Color } from '@tiptap/extension-color'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import type { BrandColorDto } from '../../lib/api'
 
 const FONT_FAMILIES = [
   { label: 'Default', value: '' },
@@ -67,14 +71,24 @@ interface RichTextEditorProps {
   onChange: (html: string) => void
   placeholder?: string
   inline?: boolean
+  brandColors?: BrandColorDto[]
 }
 
-export default function RichTextEditor({ value, onChange, placeholder, inline = false }: RichTextEditorProps) {
+export default function RichTextEditor({ value, onChange, placeholder, inline = false, brandColors = [] }: RichTextEditorProps) {
   const [showLinkPanel, setShowLinkPanel] = useState(false)
   const [linkHref, setLinkHref] = useState('')
   const [linkColor, setLinkColor] = useState('')
   const [linkFontFamily, setLinkFontFamily] = useState('')
   const [linkTextDecoration, setLinkTextDecoration] = useState('')
+  const [showColorPicker, setShowColorPicker] = useState(false)
+  const [activeColor, setActiveColor] = useState('#000000')
+  const colorButtonRef = useRef<HTMLButtonElement>(null)
+  const colorPickerRef = useRef<HTMLDivElement>(null)
+  const savedSelectionRef = useRef<{ from: number; to: number } | null>(null)
+  const [pickerRect, setPickerRect] = useState<DOMRect | null>(null)
+  // Keep a stable ref so the onUpdate closure never captures a stale onChange
+  const onChangeRef = useRef(onChange)
+  useEffect(() => { onChangeRef.current = onChange })
 
   const editor = useEditor({
     extensions: [
@@ -88,8 +102,13 @@ export default function RichTextEditor({ value, onChange, placeholder, inline = 
         listItem: false,
         code: false,
         hardBreak: inline ? false : undefined,
+        // Disabled because we register these explicitly below
+        underline: false,
+        link: false,
       }),
       Underline,
+      TextStyle,
+      Color,
       StyledLink.configure({
         openOnClick: false,
         HTMLAttributes: {
@@ -99,7 +118,7 @@ export default function RichTextEditor({ value, onChange, placeholder, inline = 
     ],
     content: value ?? '',
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML())
+      onChangeRef.current(editor.getHTML())
     },
   })
 
@@ -117,6 +136,50 @@ export default function RichTextEditor({ value, onChange, placeholder, inline = 
         ? 'bg-blue-500/30 text-blue-300'
         : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
     }`
+
+  const currentTextColor = editor.getAttributes('textStyle').color as string | undefined
+
+  const openColorPicker = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const { from, to } = editor.state.selection
+    savedSelectionRef.current = { from, to }
+    if (!showColorPicker) {
+      setPickerRect(colorButtonRef.current?.getBoundingClientRect() ?? null)
+      setActiveColor(currentTextColor ?? '#000000')
+    }
+    setShowColorPicker(v => !v)
+    setShowLinkPanel(false)
+  }
+
+  const applyColor = (color: string, close = true) => {
+    setActiveColor(color)
+    const sel = savedSelectionRef.current
+    const chain = editor.chain().focus()
+    if (sel && sel.from !== sel.to) {
+      chain.setTextSelection({ from: sel.from, to: sel.to })
+    }
+    chain.setColor(color).run()
+    // Explicitly fire onChange in case setColor on a collapsed cursor doesn't trigger onUpdate
+    onChangeRef.current(editor.getHTML())
+    if (close) {
+      setShowColorPicker(false)
+      savedSelectionRef.current = null
+    }
+  }
+
+  const resetColor = (e: React.MouseEvent) => {
+    e.preventDefault()
+    const sel = savedSelectionRef.current
+    const chain = editor.chain().focus()
+    if (sel && sel.from !== sel.to) {
+      chain.setTextSelection({ from: sel.from, to: sel.to })
+    }
+    chain.unsetColor().run()
+    onChangeRef.current(editor.getHTML())
+    setActiveColor('#000000')
+    setShowColorPicker(false)
+    savedSelectionRef.current = null
+  }
 
   const openLinkPanel = () => {
     if (showLinkPanel) {
@@ -153,11 +216,14 @@ export default function RichTextEditor({ value, onChange, placeholder, inline = 
         })
         .run()
     }
+    // Ensure draft is updated immediately (mirrors applyColor pattern)
+    onChangeRef.current(editor.getHTML())
     setShowLinkPanel(false)
   }
 
   const removeLink = () => {
     editor.chain().focus().extendMarkRange('link').unsetLink().run()
+    onChangeRef.current(editor.getHTML())
     setShowLinkPanel(false)
   }
 
@@ -166,7 +232,7 @@ export default function RichTextEditor({ value, onChange, placeholder, inline = 
       <div className="flex flex-wrap gap-1">
         <button
           type="button"
-          onClick={() => editor.chain().focus().toggleBold().run()}
+          onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleBold().run() }}
           className={btnClass(editor.isActive('bold'))}
           title="Bold"
         >
@@ -174,7 +240,7 @@ export default function RichTextEditor({ value, onChange, placeholder, inline = 
         </button>
         <button
           type="button"
-          onClick={() => editor.chain().focus().toggleItalic().run()}
+          onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleItalic().run() }}
           className={btnClass(editor.isActive('italic'))}
           title="Italic"
         >
@@ -182,7 +248,7 @@ export default function RichTextEditor({ value, onChange, placeholder, inline = 
         </button>
         <button
           type="button"
-          onClick={() => editor.chain().focus().toggleUnderline().run()}
+          onMouseDown={e => { e.preventDefault(); editor.chain().focus().toggleUnderline().run() }}
           className={btnClass(editor.isActive('underline'))}
           title="Underline"
         >
@@ -190,12 +256,116 @@ export default function RichTextEditor({ value, onChange, placeholder, inline = 
         </button>
         <button
           type="button"
-          onClick={openLinkPanel}
+          onMouseDown={e => { e.preventDefault(); openLinkPanel() }}
           className={btnClass(editor.isActive('link') || showLinkPanel)}
           title="Link"
         >
           🔗
         </button>
+
+        {/* Text colour picker */}
+        <div className="relative">
+          <button
+            ref={colorButtonRef}
+            type="button"
+            onMouseDown={openColorPicker}
+            className={btnClass(showColorPicker)}
+            title="Text colour"
+          >
+            <span className="flex flex-col items-center leading-none gap-[2px]">
+              <span className="text-xs font-bold">A</span>
+              <span
+                className="h-[3px] w-full rounded-full"
+                style={{ backgroundColor: currentTextColor ?? '#ffffff' }}
+              />
+            </span>
+          </button>
+        </div>
+        {showColorPicker && pickerRect && createPortal(
+          <>
+            {/* Click-outside overlay */}
+            <div
+              className="fixed inset-0 z-[9998]"
+              onMouseDown={() => { setShowColorPicker(false); savedSelectionRef.current = null }}
+            />
+            <div
+              ref={colorPickerRef}
+              className="z-[9999] fixed rounded-xl border border-white/10 bg-slate-900 p-3 flex flex-col gap-3 shadow-xl min-w-[220px] overflow-y-auto"
+              style={{
+                left: pickerRect.left,
+                ...(pickerRect.bottom + 280 > window.innerHeight
+                  ? { bottom: window.innerHeight - pickerRect.top + 6, maxHeight: pickerRect.top - 12 }
+                  : { top: pickerRect.bottom + 6, maxHeight: window.innerHeight - pickerRect.bottom - 12 }),
+              }}
+              onMouseDown={e => e.stopPropagation()}
+            >
+              {/* Brand colours */}
+              {brandColors.length > 0 && (
+                <>
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-[10px] uppercase tracking-widest text-slate-500">Brand</span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {brandColors.map((c, i) => (
+                        <button
+                          key={i}
+                          type="button"
+                          onMouseDown={e => { e.preventDefault(); applyColor(c.value) }}
+                          className="h-7 w-7 rounded-lg border border-white/20 hover:scale-110 transition-transform cursor-pointer shadow-sm"
+                          style={{ backgroundColor: c.value }}
+                          title={c.name || c.value}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                  <div className="border-t border-white/10" />
+                </>
+              )}
+
+              {/* Native colour picker + hex input */}
+              <div className="flex flex-col gap-2">
+                <span className="text-[10px] uppercase tracking-widest text-slate-500">Colour</span>
+                <div className="flex items-center gap-2">
+                  {/* Swatch with native picker overlaid */}
+                  <div className="relative h-9 w-9 flex-shrink-0 cursor-pointer rounded-lg border border-white/20 overflow-hidden shadow-sm"
+                    style={{ backgroundColor: activeColor }}
+                  >
+                    <input
+                      type="color"
+                      value={activeColor}
+                      onChange={e => applyColor(e.target.value, false)}
+                      className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                      title="Pick colour"
+                    />
+                  </div>
+                  {/* Hex input */}
+                  <input
+                    type="text"
+                    value={activeColor}
+                    onChange={e => { setActiveColor(e.target.value) }}
+                    onKeyDown={e => { if (e.key === 'Enter') applyColor(activeColor) }}
+                    placeholder="#000000"
+                    className="flex-1 min-w-0 rounded-lg border border-white/10 bg-slate-800 px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500/50 font-mono"
+                  />
+                  <button
+                    type="button"
+                    onMouseDown={e => { e.preventDefault(); applyColor(activeColor) }}
+                    className="px-2 py-1.5 rounded-lg bg-blue-600 text-xs text-white hover:bg-blue-500 flex-shrink-0"
+                  >✓</button>
+                </div>
+              </div>
+
+              {/* Remove colour */}
+              <button
+                type="button"
+                onMouseDown={resetColor}
+                className="w-full py-1.5 rounded-lg bg-slate-700/60 text-xs text-slate-300 hover:bg-slate-700 transition-colors"
+              >
+                Remove colour
+              </button>
+            </div>
+          </>,
+          document.body
+        )}
       </div>
 
       {showLinkPanel && (

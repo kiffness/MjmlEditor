@@ -6,10 +6,14 @@ using MjmlEditor.Application.Templates;
 using MjmlEditor.Application.Tenancy;
 using MjmlEditor.Database.BrandLibrary;
 using MjmlEditor.Database.Configuration;
+using MjmlEditor.Database.Params;
+using MjmlEditor.Database.SavedSections;
 using MjmlEditor.Database.Templates;
 using MjmlEditor.Database.Tenants;
 using MjmlEditor.Database.Users;
 using MjmlEditor.Domain.BrandLibrary;
+using MjmlEditor.Domain.Params;
+using MjmlEditor.Domain.SavedSections;
 using MongoDB.Driver;
 
 namespace MjmlEditor.Database;
@@ -43,6 +47,12 @@ public static class DependencyInjection
             .Validate(
                 options => !string.IsNullOrWhiteSpace(options.BrandLibraryCollectionName),
                 $"{MongoDbOptions.SectionName}:BrandLibraryCollectionName is required.")
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.SavedSectionsCollectionName),
+                $"{MongoDbOptions.SectionName}:SavedSectionsCollectionName is required.")
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.TenantParamsCollectionName),
+                $"{MongoDbOptions.SectionName}:TenantParamsCollectionName is required.")
             .ValidateOnStart();
 
         services.AddSingleton(sp => sp.GetRequiredService<IOptions<MongoDbOptions>>().Value);
@@ -53,6 +63,8 @@ public static class DependencyInjection
         services.AddScoped<IEmailTemplateRepository, MongoEmailTemplateRepository>();
         services.AddScoped<ITenantRepository, MongoTenantRepository>();
         services.AddScoped<IBrandLibraryRepository, MongoBrandLibraryRepository>();
+        services.AddScoped<ISavedSectionRepository, MongoSavedSectionRepository>();
+        services.AddScoped<ITenantParamsRepository, MongoTenantParamsRepository>();
 
         return services;
     }

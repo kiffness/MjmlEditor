@@ -44,6 +44,9 @@ function createProps(overrides?: Partial<ComponentProps<typeof BuilderSidebar>>)
     handleStartBuilder: vi.fn(),
     clearDragState: vi.fn(),
     brandColors: [],
+    savedSections: [],
+    onInsertSavedSection: vi.fn(),
+    onDeleteSavedSection: vi.fn(),
     ...overrides,
   }
 }

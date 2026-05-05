@@ -10,6 +10,7 @@ import type {
   EditorTextTransform,
   EditorVerticalAlignment,
   BrandColorDto,
+  SavedSectionDto,
 } from '../../lib/api'
 import {
   blockLayoutOptions,
@@ -267,6 +268,9 @@ type BuilderSidebarProps = {
   handleStartBuilder: (preset?: BuilderPreset) => void
   clearDragState: () => void
   brandColors: BrandColorDto[]
+  savedSections: SavedSectionDto[]
+  onInsertSavedSection: (savedSection: SavedSectionDto) => void
+  onDeleteSavedSection: (id: string) => void
 }
 
 export function BuilderSidebar({
@@ -295,6 +299,10 @@ export function BuilderSidebar({
   handleSelectBlock,
   handleStartBuilder,
   clearDragState,
+  brandColors,
+  savedSections,
+  onInsertSavedSection,
+  onDeleteSavedSection,
 }: BuilderSidebarProps) {
   const hasBuilderDocument = draft.editorDocument !== null
 
@@ -384,54 +392,10 @@ export function BuilderSidebar({
                   <p className="mt-1 text-xs text-slate-500">{selectedBlock.id}</p>
 
                   <div className="mt-4 space-y-3">
-                    {(['Hero', 'Text', 'Footer'] as EditorBlockType[]).includes(selectedBlock.type) && (
-                      <label className="block">
-                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                          Copy
-                        </span>
-                        <RichTextEditor
-                          value={selectedBlock.textContent}
-                          onChange={(html) => handleUpdateSelectedBlock({ textContent: html })}
-                        />
-                      </label>
-                    )}
-
-                    {selectedBlock.type === 'Badge' && (
-                      <label className="block">
-                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                          Label
-                        </span>
-                        <RichTextEditor
-                          value={selectedBlock.textContent}
-                          onChange={(html) => handleUpdateSelectedBlock({ textContent: html })}
-                          inline
-                        />
-                      </label>
-                    )}
-
-                    {selectedBlock.type === 'Quote' && (
-                      <>
-                        <label className="block">
-                          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                            Quote
-                          </span>
-                          <RichTextEditor
-                            value={selectedBlock.textContent}
-                            onChange={(html) => handleUpdateSelectedBlock({ textContent: html })}
-                            inline
-                          />
-                        </label>
-                        <label className="block">
-                          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                            Attribution
-                          </span>
-                          <RichTextEditor
-                            value={selectedBlock.secondaryText}
-                            onChange={(html) => handleUpdateSelectedBlock({ secondaryText: html })}
-                            inline
-                          />
-                        </label>
-                      </>
+                    {(['Hero', 'Text', 'Footer', 'Badge', 'Quote'] as EditorBlockType[]).includes(selectedBlock.type) && (
+                      <p className="rounded-xl bg-slate-800/60 px-3 py-2 text-xs text-slate-400">
+                        ✏️ Edit text content in the <span className="font-semibold text-slate-300">Styles</span> tab.
+                      </p>
                     )}
 
                     {(['Image', 'Logo'] as EditorBlockType[]).includes(selectedBlock.type) && (
@@ -527,19 +491,6 @@ export function BuilderSidebar({
                           value={selectedBlock.dividerThickness ?? ''}
                           onChange={(event) => handleUpdateSelectedBlock({ dividerThickness: toOptionalNumber(event.target.value) })}
                           className="w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-sm text-white outline-none transition focus:border-sky-400/60 focus:ring-2 focus:ring-sky-400/20"
-                        />
-                      </label>
-                    )}
-
-                    {selectedBlock.type === 'Footer' && (
-                      <label className="block">
-                        <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
-                          Secondary line
-                        </span>
-                        <RichTextEditor
-                          value={selectedBlock.secondaryText}
-                          onChange={(html) => handleUpdateSelectedBlock({ secondaryText: html })}
-                          inline
                         />
                       </label>
                     )}
@@ -755,6 +706,51 @@ export function BuilderSidebar({
             </div>
           )}
 
+          {activeBuilderTab === 'saved' && (
+            <div className="space-y-4">
+              {savedSections.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-white/10 bg-slate-950/40 px-4 py-5 text-sm text-slate-400">
+                  No saved sections yet. Right-click a section in the canvas and choose <strong className="text-slate-300">Save to library</strong> to reuse it across templates.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {savedSections.map((saved) => (
+                    <div key={saved.id} className="rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-white">{saved.name}</p>
+                          <p className="mt-0.5 text-xs text-slate-400">
+                            {saved.sectionData.columns.length} column{saved.sectionData.columns.length === 1 ? '' : 's'}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onInsertSavedSection(saved)}
+                            className="rounded-xl border border-white/10 px-3 py-1.5 text-xs font-medium text-slate-200 transition hover:border-sky-400/50 hover:text-sky-300"
+                          >
+                            Insert
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`Delete "${saved.name}" from the library? Templates using it will keep their current copy but lose the link.`)) {
+                                onDeleteSavedSection(saved.id)
+                              }
+                            }}
+                            className="rounded-xl border border-white/10 px-3 py-1.5 text-xs font-medium text-rose-400 transition hover:border-rose-400/50 hover:bg-rose-400/10"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           {activeBuilderTab === 'styles' && (
             <div className="space-y-4">
               {!selectedSection && !selectedColumn && !selectedBlock ? (
@@ -857,6 +853,76 @@ export function BuilderSidebar({
                     <div className="rounded-3xl border border-white/10 bg-slate-950/50 p-4">
                       <p className="text-sm font-semibold text-white">{toBlockLabel(selectedBlock.type)} styles</p>
                       <div className="mt-4 space-y-3">
+
+                        {/* RTE text content fields */}
+                        {(['Hero', 'Text', 'Footer'] as EditorBlockType[]).includes(selectedBlock.type) && (
+                          <label className="block">
+                            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                              Copy
+                            </span>
+                            <RichTextEditor
+                              value={selectedBlock.textContent}
+                              onChange={(html) => handleUpdateSelectedBlock({ textContent: html })}
+                              brandColors={brandColors}
+                            />
+                          </label>
+                        )}
+
+                        {selectedBlock.type === 'Badge' && (
+                          <label className="block">
+                            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                              Label
+                            </span>
+                            <RichTextEditor
+                              value={selectedBlock.textContent}
+                              onChange={(html) => handleUpdateSelectedBlock({ textContent: html })}
+                              inline
+                              brandColors={brandColors}
+                            />
+                          </label>
+                        )}
+
+                        {selectedBlock.type === 'Quote' && (
+                          <>
+                            <label className="block">
+                              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                                Quote
+                              </span>
+                              <RichTextEditor
+                                value={selectedBlock.textContent}
+                                onChange={(html) => handleUpdateSelectedBlock({ textContent: html })}
+                                inline
+                                brandColors={brandColors}
+                              />
+                            </label>
+                            <label className="block">
+                              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                                Attribution
+                              </span>
+                              <RichTextEditor
+                                value={selectedBlock.secondaryText}
+                                onChange={(html) => handleUpdateSelectedBlock({ secondaryText: html })}
+                                inline
+                                brandColors={brandColors}
+                              />
+                            </label>
+                          </>
+                        )}
+
+                        {selectedBlock.type === 'Footer' && (
+                          <label className="block">
+                            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                              Secondary line
+                            </span>
+                            <RichTextEditor
+                              value={selectedBlock.secondaryText}
+                              onChange={(html) => handleUpdateSelectedBlock({ secondaryText: html })}
+                              inline
+                              brandColors={brandColors}
+                            />
+                          </label>
+                        )}
+
                         {!['Spacer', 'Divider'].includes(selectedBlock.type) && (
                           <label className="block">
                             <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">

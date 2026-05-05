@@ -69,55 +69,66 @@ public static class EmailTemplateMappings
         return new EmailTemplateEditorDocumentDto
         {
             Version = document.Version,
-            Sections = document.Sections.Select(section => new EmailTemplateEditorSectionDto
+            Sections = document.Sections.Select(s => s.ToDto()).ToArray()
+        };
+    }
+
+    /// <summary>
+    /// Converts a single section from the domain model into its API DTO.
+    /// </summary>
+    public static EmailTemplateEditorSectionDto ToDto(this EmailTemplateEditorSection section)
+    {
+        ArgumentNullException.ThrowIfNull(section);
+
+        return new EmailTemplateEditorSectionDto
+        {
+            Id = section.Id,
+            BackgroundColor = section.BackgroundColor,
+            Padding = section.Padding,
+            SavedSectionId = section.SavedSectionId,
+            Columns = section.Columns.Select(column => new EmailTemplateEditorColumnDto
             {
-                Id = section.Id,
-                BackgroundColor = section.BackgroundColor,
-                Padding = section.Padding,
-                Columns = section.Columns.Select(column => new EmailTemplateEditorColumnDto
+                Id = column.Id,
+                WidthPercentage = column.WidthPercentage,
+                BackgroundColor = column.BackgroundColor,
+                Padding = column.Padding,
+                VerticalAlignment = column.VerticalAlignment,
+                Blocks = column.Blocks.Select(block => new EmailTemplateEditorBlockDto
                 {
-                    Id = column.Id,
-                    WidthPercentage = column.WidthPercentage,
-                    BackgroundColor = column.BackgroundColor,
-                    Padding = column.Padding,
-                    VerticalAlignment = column.VerticalAlignment,
-                    Blocks = column.Blocks.Select(block => new EmailTemplateEditorBlockDto
+                    Id = block.Id,
+                    Type = block.Type,
+                    TextContent = block.TextContent,
+                    SecondaryText = block.SecondaryText,
+                    ImageUrl = block.ImageUrl,
+                    AltText = block.AltText,
+                    ActionLabel = block.ActionLabel,
+                    ActionUrl = block.ActionUrl,
+                    BackgroundColor = block.BackgroundColor,
+                    TextColor = block.TextColor,
+                    Alignment = block.Alignment,
+                    FontFamily = block.FontFamily,
+                    FontWeight = block.FontWeight,
+                    FontSize = block.FontSize,
+                    LineHeight = block.LineHeight,
+                    LetterSpacing = block.LetterSpacing,
+                    TextTransform = block.TextTransform,
+                    TextDecoration = block.TextDecoration,
+                    Layout = block.Layout,
+                    ActionPlacement = block.ActionPlacement,
+                    Spacing = block.Spacing,
+                    DividerColor = block.DividerColor,
+                    DividerThickness = block.DividerThickness,
+                    BorderColor = block.BorderColor,
+                    BorderWidth = block.BorderWidth,
+                    BorderRadius = block.BorderRadius,
+                    WidthPercentage = block.WidthPercentage,
+                    BlockPadding = block.BlockPadding,
+                    HeadingLevel = block.HeadingLevel,
+                    Items = block.Items.Select(item => new EmailTemplateEditorBlockItemDto
                     {
-                        Id = block.Id,
-                        Type = block.Type,
-                        TextContent = block.TextContent,
-                        SecondaryText = block.SecondaryText,
-                        ImageUrl = block.ImageUrl,
-                        AltText = block.AltText,
-                        ActionLabel = block.ActionLabel,
-                        ActionUrl = block.ActionUrl,
-                        BackgroundColor = block.BackgroundColor,
-                        TextColor = block.TextColor,
-                        Alignment = block.Alignment,
-                        FontFamily = block.FontFamily,
-                        FontWeight = block.FontWeight,
-                        FontSize = block.FontSize,
-                        LineHeight = block.LineHeight,
-                        LetterSpacing = block.LetterSpacing,
-                        TextTransform = block.TextTransform,
-                        TextDecoration = block.TextDecoration,
-                        Layout = block.Layout,
-                        ActionPlacement = block.ActionPlacement,
-                        Spacing = block.Spacing,
-                        DividerColor = block.DividerColor,
-                        DividerThickness = block.DividerThickness,
-                        BorderColor = block.BorderColor,
-                        BorderWidth = block.BorderWidth,
-                        BorderRadius = block.BorderRadius,
-                        WidthPercentage = block.WidthPercentage,
-                        BlockPadding = block.BlockPadding,
-                        HeadingLevel = block.HeadingLevel,
-                        Items = block.Items.Select(item => new EmailTemplateEditorBlockItemDto
-                        {
-                            Id = item.Id,
-                            Label = item.Label,
-                            Url = item.Url
-                        }).ToArray()
+                        Id = item.Id,
+                        Label = item.Label,
+                        Url = item.Url
                     }).ToArray()
                 }).ToArray()
             }).ToArray()
@@ -133,49 +144,60 @@ public static class EmailTemplateMappings
 
         return EmailTemplateEditorDocument.Create(
             document.Version,
-            document.Sections.Select(section => EmailTemplateEditorSection.Create(
-                section.Id,
-                section.BackgroundColor,
-                section.Padding,
-                section.Columns.Select(column => EmailTemplateEditorColumn.Create(
-                    column.Id,
-                    column.WidthPercentage,
-                    column.BackgroundColor,
-                    column.Padding,
-                    column.VerticalAlignment,
-                    column.Blocks.Select(block => EmailTemplateEditorBlock.Create(
-                        block.Id,
-                        block.Type,
-                        block.TextContent,
-                        block.SecondaryText,
-                        block.ImageUrl,
-                        block.AltText,
-                        block.ActionLabel,
-                        block.ActionUrl,
-                        block.BackgroundColor,
-                        block.TextColor,
-                        block.Alignment,
-                        block.FontFamily,
-                        block.FontWeight,
-                        block.FontSize,
-                        block.LineHeight,
-                        block.LetterSpacing,
-                        block.TextTransform,
-                        block.TextDecoration,
-                        block.Layout,
-                        block.ActionPlacement,
-                        block.Spacing,
-                        block.DividerColor,
-                        block.DividerThickness,
-                        block.BorderColor,
-                        block.BorderWidth,
-                        block.BorderRadius,
-                        block.WidthPercentage,
-                        block.BlockPadding,
-                        block.HeadingLevel,
-                        block.Items?.Select(item => EmailTemplateEditorBlockItem.Create(
-                            item.Id,
-                            item.Label,
-                            item.Url)).ToArray() ?? [])).ToArray())).ToArray())).ToArray());
+            document.Sections.Select(s => s.ToDomain()).ToArray());
+    }
+
+    /// <summary>
+    /// Converts a single section DTO into the validated domain model.
+    /// </summary>
+    public static EmailTemplateEditorSection ToDomain(this EmailTemplateEditorSectionDto section)
+    {
+        ArgumentNullException.ThrowIfNull(section);
+
+        return EmailTemplateEditorSection.Create(
+            section.Id,
+            section.BackgroundColor,
+            section.Padding,
+            section.SavedSectionId,
+            section.Columns.Select(column => EmailTemplateEditorColumn.Create(
+                column.Id,
+                column.WidthPercentage,
+                column.BackgroundColor,
+                column.Padding,
+                column.VerticalAlignment,
+                column.Blocks.Select(block => EmailTemplateEditorBlock.Create(
+                    block.Id,
+                    block.Type,
+                    block.TextContent,
+                    block.SecondaryText,
+                    block.ImageUrl,
+                    block.AltText,
+                    block.ActionLabel,
+                    block.ActionUrl,
+                    block.BackgroundColor,
+                    block.TextColor,
+                    block.Alignment,
+                    block.FontFamily,
+                    block.FontWeight,
+                    block.FontSize,
+                    block.LineHeight,
+                    block.LetterSpacing,
+                    block.TextTransform,
+                    block.TextDecoration,
+                    block.Layout,
+                    block.ActionPlacement,
+                    block.Spacing,
+                    block.DividerColor,
+                    block.DividerThickness,
+                    block.BorderColor,
+                    block.BorderWidth,
+                    block.BorderRadius,
+                    block.WidthPercentage,
+                    block.BlockPadding,
+                    block.HeadingLevel,
+                    block.Items?.Select(item => EmailTemplateEditorBlockItem.Create(
+                        item.Id,
+                        item.Label,
+                        item.Url)).ToArray() ?? [])).ToArray())).ToArray());
     }
 }

@@ -34,5 +34,6 @@ app.MapAuthEndpoints();
 app.MapTenantEndpoints();
 app.MapEmailTemplateEndpoints();
 app.MapBrandLibraryEndpoints();
+app.MapSavedSectionsEndpoints();
 
 app.Run();

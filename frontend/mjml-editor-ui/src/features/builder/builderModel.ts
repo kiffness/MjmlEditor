@@ -23,7 +23,7 @@ export type TemplateDraft = {
   editorDocument: EditorDocument | null
 }
 
-export type BuilderSidebarTab = 'blocks' | 'sections' | 'presets' | 'styles' | 'layers'
+export type BuilderSidebarTab = 'blocks' | 'sections' | 'presets' | 'styles' | 'layers' | 'saved'
 
 export type BuilderPreset = 'hero' | 'announcement' | 'image-left-text-right' | 'image-right-text-left' | 'three-up-features'
 
@@ -47,6 +47,7 @@ export const builderTabs: { id: BuilderSidebarTab; label: string }[] = [
   { id: 'presets', label: 'Presets' },
   { id: 'styles', label: 'Styles' },
   { id: 'layers', label: 'Layers' },
+  { id: 'saved', label: 'Saved' },
 ]
 
 export const builderBlockPalette: { type: EditorBlockType; label: string; description: string }[] = [
@@ -683,6 +684,14 @@ export function applyBrandToBlock(block: EditorBlock, brand: BrandLibraryDto): E
       fontFamily: btn.fontFamily ?? block.fontFamily,
       fontSize: btn.fontSize ?? block.fontSize,
       fontWeight: btn.fontWeight ?? block.fontWeight,
+    }
+  }
+
+  if (block.type === 'Logo' && brand.defaultLogoUrl) {
+    return {
+      ...block,
+      imageUrl: block.imageUrl || brand.defaultLogoUrl,
+      altText: block.altText || brand.defaultLogoAltText || block.altText,
     }
   }
 

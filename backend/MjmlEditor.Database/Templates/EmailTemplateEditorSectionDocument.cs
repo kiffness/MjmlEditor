@@ -8,5 +8,7 @@ public sealed class EmailTemplateEditorSectionDocument
 
     public int? Padding { get; init; }
 
+    public string? SavedSectionId { get; init; }
+
     public IReadOnlyList<EmailTemplateEditorColumnDocument> Columns { get; init; } = [];
 }

@@ -8,12 +8,19 @@ public sealed class EmailTemplateEditorSection
 
     public int? Padding { get; }
 
+    /// <summary>
+    /// When set, this section is linked to a saved section in the library with this id.
+    /// Linked sections are read-only in the main canvas and must be edited via the Linked Section Editor.
+    /// </summary>
+    public string? SavedSectionId { get; }
+
     public IReadOnlyList<EmailTemplateEditorColumn> Columns { get; }
 
     public static EmailTemplateEditorSection Create(
         string id,
         string? backgroundColor,
         int? padding,
+        string? savedSectionId,
         IReadOnlyList<EmailTemplateEditorColumn> columns)
     {
         ArgumentNullException.ThrowIfNull(columns);
@@ -32,6 +39,7 @@ public sealed class EmailTemplateEditorSection
             NormalizeRequired(id, nameof(id)),
             NormalizeOptional(backgroundColor),
             padding,
+            NormalizeOptional(savedSectionId),
             columns.Select(column => column.Clone()).ToArray());
     }
 
@@ -39,25 +47,28 @@ public sealed class EmailTemplateEditorSection
         string id,
         string? backgroundColor,
         int? padding,
+        string? savedSectionId,
         IReadOnlyList<EmailTemplateEditorColumn> columns)
     {
-        return Create(id, backgroundColor, padding, columns);
+        return Create(id, backgroundColor, padding, savedSectionId, columns);
     }
 
     public EmailTemplateEditorSection Clone()
     {
-        return Restore(Id, BackgroundColor, Padding, Columns);
+        return Restore(Id, BackgroundColor, Padding, SavedSectionId, Columns);
     }
 
     private EmailTemplateEditorSection(
         string id,
         string? backgroundColor,
         int? padding,
+        string? savedSectionId,
         IReadOnlyList<EmailTemplateEditorColumn> columns)
     {
         Id = id;
         BackgroundColor = backgroundColor;
         Padding = padding;
+        SavedSectionId = savedSectionId;
         Columns = columns;
     }
 

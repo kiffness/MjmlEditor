@@ -111,6 +111,7 @@ export type EditorSection = {
   id: string
   backgroundColor?: string | null
   padding?: number | null
+  savedSectionId?: string | null
   columns: EditorColumn[]
 }
 
@@ -206,6 +207,8 @@ export type BrandButtonStyleDto = {
 
 export type BrandLibraryDto = {
   sectionDefaultBackgroundColor?: string | null
+  defaultLogoUrl?: string | null
+  defaultLogoAltText?: string | null
   colors: BrandColorDto[]
   headingStyles: BrandHeadingStyleDto[]
   textStyles: BrandTextStyleDto[]
@@ -214,6 +217,8 @@ export type BrandLibraryDto = {
 
 export const defaultBrandLibrary: BrandLibraryDto = {
   sectionDefaultBackgroundColor: null,
+  defaultLogoUrl: null,
+  defaultLogoAltText: null,
   colors: [],
   headingStyles: [],
   textStyles: [],
@@ -391,6 +396,50 @@ export function deleteTemplate(tenantId: string, templateId: string) {
     {
       method: 'DELETE',
     },
+    tenantId
+  )
+}
+
+export type SavedSectionDto = {
+  id: string
+  name: string
+  sectionData: EditorSection
+  createdAtUtc: string
+  updatedAtUtc: string
+}
+
+export function listSavedSections(tenantId: string) {
+  return request<SavedSectionDto[]>('/api/saved-sections', undefined, tenantId)
+}
+
+export function createSavedSection(tenantId: string, name: string, sectionData: EditorSection) {
+  return request<SavedSectionDto>(
+    '/api/saved-sections',
+    { method: 'POST', body: JSON.stringify({ name, sectionData }) },
+    tenantId
+  )
+}
+
+export function renameSavedSection(tenantId: string, id: string, name: string) {
+  return request<SavedSectionDto>(
+    `/api/saved-sections/${id}`,
+    { method: 'PUT', body: JSON.stringify({ name }) },
+    tenantId
+  )
+}
+
+export function propagateSavedSection(tenantId: string, id: string, sectionData: EditorSection) {
+  return request<SavedSectionDto>(
+    `/api/saved-sections/${id}/propagate`,
+    { method: 'POST', body: JSON.stringify({ sectionData }) },
+    tenantId
+  )
+}
+
+export function deleteSavedSection(tenantId: string, id: string) {
+  return request<void>(
+    `/api/saved-sections/${id}`,
+    { method: 'DELETE' },
     tenantId
   )
 }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using MjmlEditor.Database.Configuration;
+using MjmlEditor.Database.Params;
 using MjmlEditor.Database.Templates;
 using MjmlEditor.Database.Tenants;
 using MjmlEditor.Database.Users;
@@ -49,6 +50,7 @@ var database = client.GetDatabase(mongoOptions.DatabaseName);
 var tenantsCollection = database.GetCollection<TenantDocument>(mongoOptions.TenantsCollectionName);
 var templatesCollection = database.GetCollection<EmailTemplateDocument>(mongoOptions.TemplatesCollectionName);
 var usersCollection = database.GetCollection<UserAccountDocument>(mongoOptions.UsersCollectionName);
+var tenantParamsCollection = database.GetCollection<TenantParamsDocument>(mongoOptions.TenantParamsCollectionName);
 var faker = new Faker();
 var tenants = CreateTenants(seedOptions.TenantIds, faker);
 var passwordHasher = new PasswordHasher<object>();
@@ -60,6 +62,8 @@ if (seedOptions.ReplaceExistingTenantData)
         tenant => seedOptions.TenantIds.Contains(tenant.Id));
     var deleteResult = await templatesCollection.DeleteManyAsync(
         template => seedOptions.TenantIds.Contains(template.TenantId));
+    await tenantParamsCollection.DeleteManyAsync(
+        p => seedOptions.TenantIds.Contains(p.TenantId));
 
     Console.WriteLine($"Removed {deleteTenantResult.DeletedCount} existing seeded tenants.");
     Console.WriteLine($"Removed {deleteResult.DeletedCount} existing seeded templates.");
@@ -96,6 +100,22 @@ await tenantsCollection.BulkWriteAsync(tenantWrites);
 await usersCollection.BulkWriteAsync(userWrites);
 await templatesCollection.InsertManyAsync(templates);
 
+var now = DateTime.UtcNow;
+var tenantParamDocs = seedOptions.TenantIds
+    .Select(tenantId => CreateParamsForTenant(tenantId, now))
+    .ToArray();
+
+var paramWrites = tenantParamDocs
+    .Select(doc => new ReplaceOneModel<TenantParamsDocument>(
+        Builders<TenantParamsDocument>.Filter.Eq(p => p.TenantId, doc.TenantId),
+        doc)
+    {
+        IsUpsert = true
+    })
+    .ToArray();
+
+await tenantParamsCollection.BulkWriteAsync(paramWrites);
+
 Console.WriteLine(
     $"Seeded {templates.Length} templates across {seedOptions.TenantIds.Length} tenants into '{mongoOptions.DatabaseName}'.");
 
@@ -105,6 +125,8 @@ foreach (var tenantCount in templates
 {
     Console.WriteLine($"- {tenantCount.Key}: {tenantCount.Count()} templates");
 }
+
+Console.WriteLine($"Seeded {tenantParamDocs.Length} tenant param sets ({tenantParamDocs[0].Params.Length} params each).");
 
 Console.WriteLine("Seeded demo users:");
 
@@ -309,6 +331,52 @@ static IReadOnlyList<UserAccountDocument> CreateUsers(IReadOnlyList<string> tena
     ];
 }
 
+static TenantParamsDocument CreateParamsForTenant(string tenantId, DateTime now)
+{
+    var propertyParams = new[]
+    {
+        new ParamDefinitionDocument { Key = "address",         Label = "Property Address",    Category = "Property", ExampleValue = "14 Ashford Lane, London, SW12 9BT" },
+        new ParamDefinitionDocument { Key = "price",           Label = "Asking Price",         Category = "Property", ExampleValue = "£525,000" },
+        new ParamDefinitionDocument { Key = "bedrooms",        Label = "Bedrooms",             Category = "Property", ExampleValue = "4" },
+        new ParamDefinitionDocument { Key = "bathrooms",       Label = "Bathrooms",            Category = "Property", ExampleValue = "2" },
+        new ParamDefinitionDocument { Key = "property_type",   Label = "Property Type",        Category = "Property", ExampleValue = "Semi-detached house" },
+        new ParamDefinitionDocument { Key = "tenure",          Label = "Tenure",               Category = "Property", ExampleValue = "Freehold" },
+        new ParamDefinitionDocument { Key = "epc_rating",      Label = "EPC Rating",           Category = "Property", ExampleValue = "C" },
+        new ParamDefinitionDocument { Key = "floor_area",      Label = "Floor Area",           Category = "Property", ExampleValue = "112 sqm" },
+        new ParamDefinitionDocument { Key = "council_tax_band",Label = "Council Tax Band",     Category = "Property", ExampleValue = "E" },
+        new ParamDefinitionDocument { Key = "description",     Label = "Property Description", Category = "Property", ExampleValue = "A beautifully presented family home set within a quiet residential street, offering generous living space and a south-facing rear garden." },
+    };
+
+    var agentParams = new[]
+    {
+        new ParamDefinitionDocument { Key = "agent_name",      Label = "Agent Name",           Category = "Agent", ExampleValue = "Sarah Collins" },
+        new ParamDefinitionDocument { Key = "agent_phone",     Label = "Agent Phone",          Category = "Agent", ExampleValue = "020 7123 4567" },
+        new ParamDefinitionDocument { Key = "agent_email",     Label = "Agent Email",          Category = "Agent", ExampleValue = "sarah.collins@prestige.co.uk" },
+        new ParamDefinitionDocument { Key = "branch_name",     Label = "Branch Name",          Category = "Agent", ExampleValue = "Prestige Properties – Clapham" },
+    };
+
+    var vendorParams = new[]
+    {
+        new ParamDefinitionDocument { Key = "vendor_name",     Label = "Vendor Name",          Category = "Vendor", ExampleValue = "Mr & Mrs Thompson" },
+    };
+
+    var dateParams = new[]
+    {
+        new ParamDefinitionDocument { Key = "viewing_date",    Label = "Viewing Date",         Category = "Dates", ExampleValue = "Saturday 17th May" },
+        new ParamDefinitionDocument { Key = "viewing_time",    Label = "Viewing Time",         Category = "Dates", ExampleValue = "10:00am – 12:00pm" },
+        new ParamDefinitionDocument { Key = "offer_expiry",    Label = "Offer Expiry",         Category = "Dates", ExampleValue = "31 May 2026" },
+    };
+
+    return new TenantParamsDocument
+    {
+        Id = tenantId,
+        TenantId = tenantId,
+        Params = [.. propertyParams, .. agentParams, .. vendorParams, .. dateParams],
+        CreatedAtUtc = now,
+        UpdatedAtUtc = now
+    };
+}
+
 static void ValidateMongoOptions(MongoDbOptions options)
 {
     if (string.IsNullOrWhiteSpace(options.ConnectionString))
@@ -357,6 +425,7 @@ static void PrintConfigurationSummary(MongoDbOptions mongoOptions, SeedOptions s
     Console.WriteLine($"- Tenants collection: {mongoOptions.TenantsCollectionName}");
     Console.WriteLine($"- Templates collection: {mongoOptions.TemplatesCollectionName}");
     Console.WriteLine($"- Users collection: {mongoOptions.UsersCollectionName}");
+    Console.WriteLine($"- Tenant params collection: {mongoOptions.TenantParamsCollectionName}");
     Console.WriteLine($"- Templates per tenant: {seedOptions.TemplatesPerTenant}");
     Console.WriteLine($"- Replace existing tenant data: {seedOptions.ReplaceExistingTenantData}");
     Console.WriteLine($"- Tenant ids: {string.Join(", ", seedOptions.TenantIds)}");

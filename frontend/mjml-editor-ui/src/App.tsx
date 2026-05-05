@@ -3,8 +3,12 @@ import {
   ApiError,
   clearStoredAuthToken,
   createTemplate,
+  createSavedSection,
   defaultBrandLibrary,
   deleteTemplate,
+  deleteSavedSection,
+  listSavedSections,
+  propagateSavedSection,
   type BrandLibraryDto,
   type EditorBlock,
   type EditorBlockItem,
@@ -27,6 +31,7 @@ import {
   saveBrandLibrary,
   type AuthenticatedUserDto,
   type MjmlRenderIssueDto,
+  type SavedSectionDto,
   type TemplateDto,
   type TemplateRevisionDto,
   type TemplateStatus,
@@ -36,6 +41,7 @@ import {
 } from './lib/api'
 import { BuilderCanvas } from './features/builder/BuilderCanvas'
 import { BuilderSidebar } from './features/builder/BuilderSidebar'
+import { LinkedSectionEditor } from './features/builder/LinkedSectionEditor'
 import {
   cloneEditorDocument,
   createDefaultBlock,
@@ -208,6 +214,9 @@ function App() {
   const [blockDropTargetId, setBlockDropTargetId] = useState<string | null>(null)
   const [brandLibrary, setBrandLibrary] = useState<BrandLibraryDto>(defaultBrandLibrary)
   const [brandLibraryReturnRoute, setBrandLibraryReturnRoute] = useState<AppRoute>({ kind: 'library' })
+  const [savedSections, setSavedSections] = useState<SavedSectionDto[]>([])
+  /** The section id currently being edited in the LinkedSectionEditor, or null if editor is closed. */
+  const [editingLinkedSectionId, setEditingLinkedSectionId] = useState<string | null>(null)
 
   const apiBaseUrl = getApiBaseUrl()
   const activeTenant = tenants.find((tenant) => tenant.id === tenantId) ?? null
@@ -279,7 +288,7 @@ function App() {
 
   const hasUnsavedChanges = useMemo(
     () => hasPersistedDraftChanges(savedDraftStateSignature, draft),
-    [draft, savedDraftStateSignature],
+    [draft, savedDraftStateSignature]
   )
 
   const setActiveTenant = useCallback((nextTenantId: string) => {
@@ -306,8 +315,15 @@ function App() {
   }, [])
 
   const setActiveTemplateId = useCallback((nextTemplateId: string | null) => {
+    const prevTemplateId = selectedTemplateIdRef.current
     selectedTemplateIdRef.current = nextTemplateId
     setSelectedTemplateId(nextTemplateId)
+    // Only reset loading and selection state when the template actually changes.
+    // If loadTemplates re-runs with the same ID (e.g. after loadTenants completes),
+    // skipping the reset prevents isTemplateLoading from getting stuck at true.
+    if (nextTemplateId === prevTemplateId) {
+      return
+    }
     setIsTemplateLoading(Boolean(nextTemplateId))
     setRevisions([])
     setIsRevisionsLoading(Boolean(nextTemplateId))
@@ -665,6 +681,12 @@ function App() {
       // Silently fall back to defaults if brand library cannot be loaded
     })
 
+    void listSavedSections(tenantId).then((sections) => {
+      if (isActive) setSavedSections(sections)
+    }).catch(() => {
+      // Silently ignore — saved sections list is non-critical
+    })
+
     return () => { isActive = false }
   }, [currentUser, tenantId])
 
@@ -740,7 +762,7 @@ function App() {
       return
     }
 
-    if (getDraftStateSignature(nextDraft) === getDraftStateSignature(draft)) {
+    if (getDraftStateSignature(draft) === getDraftStateSignature(nextDraft)) {
       return
     }
 
@@ -1134,6 +1156,90 @@ function App() {
       setSelectedBlockId(null)
     }
   }, [selectedSectionId, updateEditorDocument])
+
+  /** Saves the section to the library and marks it as linked in the draft. */
+  async function handleSaveSection(sectionId: string) {
+    if (!tenantId || !draft?.editorDocument) return
+
+    const section = draft.editorDocument.sections.find((s) => s.id === sectionId)
+    if (!section) return
+
+    const name = window.prompt('Name this saved section:', 'My Section')
+    if (!name?.trim()) return
+
+    try {
+      const created = await createSavedSection(tenantId, name.trim(), section)
+      setSavedSections((prev) => [...prev, created])
+      // Mark the section as linked
+      updateEditorDocument((current) => ({
+        ...current,
+        sections: current.sections.map((s) =>
+          s.id === sectionId ? { ...s, savedSectionId: created.id } : s
+        ),
+      }))
+    } catch {
+      alert('Failed to save section to library.')
+    }
+  }
+
+  /** Inserts a copy of a saved section as a new linked section at the end of the document. */
+  function handleInsertSavedSection(saved: SavedSectionDto) {
+    if (!draft?.editorDocument) return
+    const newSectionId = crypto.randomUUID().replace(/-/g, '')
+    const insertedSection: EditorSection = {
+      ...saved.sectionData,
+      id: newSectionId,
+      savedSectionId: saved.id,
+    }
+    updateEditorDocument((current) => ({
+      ...current,
+      sections: [...current.sections, insertedSection],
+    }))
+  }
+
+  async function handleDeleteSavedSection(id: string) {
+    if (!tenantId) return
+    try {
+      await deleteSavedSection(tenantId, id)
+      setSavedSections((prev) => prev.filter((s) => s.id !== id))
+    } catch {
+      alert('Failed to delete saved section.')
+    }
+  }
+
+  /** Called when "Apply to this template only" is chosen in the LinkedSectionEditor. */
+  function handleApplyLinkedSectionToCurrentOnly(sectionId: string, updatedSection: EditorSection) {
+    updateEditorDocument((current) => ({
+      ...current,
+      sections: current.sections.map((s) =>
+        s.id === sectionId ? { ...updatedSection, id: sectionId, savedSectionId: null } : s
+      ),
+    }))
+    setEditingLinkedSectionId(null)
+  }
+
+  /** Called when "Apply to all templates" is chosen in the LinkedSectionEditor. */
+  async function handleApplyLinkedSectionToAll(sectionId: string, updatedSection: EditorSection) {
+    if (!tenantId || !draft?.editorDocument) return
+    const section = draft.editorDocument.sections.find((s) => s.id === sectionId)
+    if (!section?.savedSectionId) return
+
+    try {
+      const propagated = await propagateSavedSection(tenantId, section.savedSectionId, updatedSection)
+      setSavedSections((prev) => prev.map((s) => s.id === propagated.id ? propagated : s))
+      // Update the local copy to reflect the propagated content (keeping the link)
+      updateEditorDocument((current) => ({
+        ...current,
+        sections: current.sections.map((s) =>
+          s.id === sectionId ? { ...updatedSection, id: sectionId, savedSectionId: section.savedSectionId } : s
+        ),
+      }))
+    } catch {
+      alert('Failed to propagate changes to all templates.')
+    }
+    setEditingLinkedSectionId(null)
+  }
+
 
   function handleDuplicateBlock(sectionId: string, columnId: string, blockId: string) {
     const section = draft?.editorDocument?.sections.find((candidate) => candidate.id === sectionId)
@@ -1889,6 +1995,9 @@ function App() {
                     handleStartBuilder={handleStartBuilder}
                     clearDragState={clearDragState}
                     brandColors={brandLibrary.colors}
+                    savedSections={savedSections}
+                    onInsertSavedSection={handleInsertSavedSection}
+                    onDeleteSavedSection={handleDeleteSavedSection}
                   />
                 </div>
 
@@ -1926,6 +2035,8 @@ function App() {
                     handleUndo={handleUndoBuilderChange}
                     handleRedo={handleRedoBuilderChange}
                     handleUpdateSelectedBlock={handleUpdateSelectedBlock}
+                    handleSaveSection={handleSaveSection}
+                    onEditLinkedSection={(sectionId) => setEditingLinkedSectionId(sectionId)}
                   />
                 </div>
 
@@ -1942,6 +2053,22 @@ function App() {
             )}
           </main>
           {previewModal}
+          {editingLinkedSectionId && draft?.editorDocument && (() => {
+            const linkedSection = draft.editorDocument.sections.find((s) => s.id === editingLinkedSectionId)
+            const savedSection = linkedSection?.savedSectionId
+              ? savedSections.find((ss) => ss.id === linkedSection.savedSectionId) ?? null
+              : null
+            if (!linkedSection || !savedSection) return null
+            return (
+              <LinkedSectionEditor
+                savedSection={{ ...savedSection, sectionData: { ...linkedSection, savedSectionId: null } }}
+                brandColors={brandLibrary.colors}
+                onApplyToThisOnly={(updated) => handleApplyLinkedSectionToCurrentOnly(editingLinkedSectionId, updated)}
+                onApplyToAll={(updated) => { void handleApplyLinkedSectionToAll(editingLinkedSectionId, updated) }}
+                onCancel={() => setEditingLinkedSectionId(null)}
+              />
+            )
+          })()}
         </div>
       </div>
     )

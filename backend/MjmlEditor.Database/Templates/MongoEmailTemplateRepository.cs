@@ -165,6 +165,7 @@ internal sealed class MongoEmailTemplateRepository : IEmailTemplateRepository
                 section.Id,
                 section.BackgroundColor,
                 section.Padding,
+                section.SavedSectionId,
                 section.Columns.Select(column => EmailTemplateEditorColumn.Restore(
                     column.Id,
                     column.WidthPercentage,
@@ -219,6 +220,7 @@ internal sealed class MongoEmailTemplateRepository : IEmailTemplateRepository
                 Id = section.Id,
                 BackgroundColor = section.BackgroundColor,
                 Padding = section.Padding,
+                SavedSectionId = section.SavedSectionId,
                 Columns = section.Columns.Select(column => new EmailTemplateEditorColumnDocument
                 {
                     Id = column.Id,

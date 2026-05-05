@@ -8,6 +8,8 @@ public sealed class BrandLibraryDocument
     public string TenantId { get; init; } = string.Empty;
 
     public string? SectionDefaultBackgroundColor { get; init; }
+    public string? DefaultLogoUrl { get; init; }
+    public string? DefaultLogoAltText { get; init; }
     public IReadOnlyList<BrandColorDocument> Colors { get; init; } = [];
     public IReadOnlyList<BrandHeadingStyleDocument> HeadingStyles { get; init; } = [];
     public IReadOnlyList<BrandTextStyleDocument> TextStyles { get; init; } = [];

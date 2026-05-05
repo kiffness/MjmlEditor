@@ -8,5 +8,10 @@ public sealed record EmailTemplateEditorSectionDto
 
     public int? Padding { get; init; }
 
+    /// <summary>
+    /// When set, this section is linked to a saved section in the library with this id.
+    /// </summary>
+    public string? SavedSectionId { get; init; }
+
     public IReadOnlyList<EmailTemplateEditorColumnDto> Columns { get; init; } = [];
 }

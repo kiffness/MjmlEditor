@@ -23,4 +23,10 @@ public sealed class MongoDbOptions
 
     [Required(AllowEmptyStrings = false)]
     public string BrandLibraryCollectionName { get; init; } = "brand_libraries";
+
+    [Required(AllowEmptyStrings = false)]
+    public string SavedSectionsCollectionName { get; init; } = "saved_sections";
+
+    [Required(AllowEmptyStrings = false)]
+    public string TenantParamsCollectionName { get; init; } = "tenant_params";
 }
